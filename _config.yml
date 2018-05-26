@@ -1,0 +1,28 @@
+# Site settings
+title:          C6 Devblog
+description:    "Minimal Jekyll theme for storytellers"
+baseurl:        ""
+url:            "c6h8o7.github.io"
+
+# Author
+author:
+  name:         Marco Lorenzo
+  url:          https://c6h8o7.github.io
+  email:        marco.lorenzo.64@gmail.com
+
+# Build settings
+markdown:       kramdown
+
+# Assets
+sass:
+  sass_dir:     _sass
+  style:        compressed
+
+# Gems
+plugins:
+  - jekyll-paginate
+  # - jemoji #Uncomment this to allow emoji in your post
+
+# Permalinks
+permalink:      /:year-:month-:day/:title
+paginate:       5
