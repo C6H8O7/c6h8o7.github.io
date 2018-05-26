@@ -5,11 +5,26 @@
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
     <title>LimeApp</title>
     <style>
-      .emscripten { padding-right: 0; margin-left: auto; margin-right: auto; display: block; }
-      textarea.emscripten { font-family: monospace; width: 80%; }
-      div.emscripten { text-align: center; }
+      .emscripten {
+		  padding-right: 0;
+		  margin-left: auto;
+		  margin-right: auto;
+		  display: block;
+	  }
+      textarea.emscripten {
+		  font-family: monospace;
+		  width: 80%;
+	  }
+      div.emscripten {
+		text-align: center;
+	  }
       /* the canvas *must not* have any border or padding, or mouse coords will be wrong */
-      canvas.emscripten { border: 0px none; background-color: black; }
+      canvas.emscripten {
+		  width: 640px;
+		  height: 480px;
+		  border: 0px none;
+		  background-color: black;
+	  }
 
       .spinner {
         height: 50px;
@@ -50,7 +65,7 @@
       <canvas class="emscripten" id="canvas" oncontextmenu="event.preventDefault()"></canvas>
     </div>
     <div class="emscripten">
-      <input type="button" value="Fullscreen" onclick="Module.requestFullscreen(false, false)">
+      <input type="button" value="Fullscreen" onclick="Module.requestFullscreen(false, true)">
     </div>
     <textarea class="emscripten" id="output" rows="8"></textarea>
     <script type='text/javascript'>
