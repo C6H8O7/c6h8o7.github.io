@@ -195,7 +195,7 @@ Module['FS_createPath']('/', 'data', true, true);
   }
 
  }
- loadPackage({"files": [{"audio": 0, "start": 0, "crunched": 0, "end": 1094, "filename": "/data/goomba.png"}, {"audio": 0, "start": 1094, "crunched": 0, "end": 640131, "filename": "/data/lime.png"}], "remote_package_size": 640131, "package_uuid": "483f9643-34cf-47d3-be7d-625c78b80bad"});
+ loadPackage({"files": [{"audio": 0, "start": 0, "crunched": 0, "end": 1094, "filename": "/data/goomba.png"}, {"audio": 0, "start": 1094, "crunched": 0, "end": 640131, "filename": "/data/lime.png"}], "remote_package_size": 640131, "package_uuid": "27cd13ab-839c-410a-8f75-d32d3cc967a7"});
 
 })();
 
@@ -5995,6 +5995,939 @@ function copyTempDouble(ptr) {
     }
 
   
+  var JSEvents={keyEvent:0,mouseEvent:0,wheelEvent:0,uiEvent:0,focusEvent:0,deviceOrientationEvent:0,deviceMotionEvent:0,fullscreenChangeEvent:0,pointerlockChangeEvent:0,visibilityChangeEvent:0,touchEvent:0,lastGamepadState:null,lastGamepadStateFrame:null,numGamepadsConnected:0,previousFullscreenElement:null,previousScreenX:null,previousScreenY:null,removeEventListenersRegistered:false,staticInit:function () {
+        if (typeof window !== 'undefined') {
+          window.addEventListener("gamepadconnected", function() { ++JSEvents.numGamepadsConnected; });
+          window.addEventListener("gamepaddisconnected", function() { --JSEvents.numGamepadsConnected; });
+          
+          // Chromium does not fire the gamepadconnected event on reload, so we need to get the number of gamepads here as a workaround.
+          // See https://bugs.chromium.org/p/chromium/issues/detail?id=502824
+          var firstState = navigator.getGamepads ? navigator.getGamepads() : (navigator.webkitGetGamepads ? navigator.webkitGetGamepads() : null);
+          if (firstState) {
+            JSEvents.numGamepadsConnected = firstState.length;
+          }
+        }
+      },registerRemoveEventListeners:function () {
+        if (!JSEvents.removeEventListenersRegistered) {
+        __ATEXIT__.push(function() {
+            for(var i = JSEvents.eventHandlers.length-1; i >= 0; --i) {
+              JSEvents._removeHandler(i);
+            }
+           });
+          JSEvents.removeEventListenersRegistered = true;
+        }
+      },findEventTarget:function (target) {
+        if (target) {
+          if (typeof target == "number") {
+            target = Pointer_stringify(target);
+          }
+          if (target == '#window') return window;
+          else if (target == '#document') return document;
+          else if (target == '#screen') return window.screen;
+          else if (target == '#canvas') return Module['canvas'];
+  
+          if (typeof target == 'string') return document.getElementById(target);
+          else return target;
+        } else {
+          // The sensible target varies between events, but use window as the default
+          // since DOM events mostly can default to that. Specific callback registrations
+          // override their own defaults.
+          return window;
+        }
+      },deferredCalls:[],deferCall:function (targetFunction, precedence, argsList) {
+        function arraysHaveEqualContent(arrA, arrB) {
+          if (arrA.length != arrB.length) return false;
+  
+          for(var i in arrA) {
+            if (arrA[i] != arrB[i]) return false;
+          }
+          return true;
+        }
+        // Test if the given call was already queued, and if so, don't add it again.
+        for(var i in JSEvents.deferredCalls) {
+          var call = JSEvents.deferredCalls[i];
+          if (call.targetFunction == targetFunction && arraysHaveEqualContent(call.argsList, argsList)) {
+            return;
+          }
+        }
+        JSEvents.deferredCalls.push({
+          targetFunction: targetFunction,
+          precedence: precedence,
+          argsList: argsList
+        });
+  
+        JSEvents.deferredCalls.sort(function(x,y) { return x.precedence < y.precedence; });
+      },removeDeferredCalls:function (targetFunction) {
+        for(var i = 0; i < JSEvents.deferredCalls.length; ++i) {
+          if (JSEvents.deferredCalls[i].targetFunction == targetFunction) {
+            JSEvents.deferredCalls.splice(i, 1);
+            --i;
+          }
+        }
+      },canPerformEventHandlerRequests:function () {
+        return JSEvents.inEventHandler && JSEvents.currentEventHandler.allowsDeferredCalls;
+      },runDeferredCalls:function () {
+        if (!JSEvents.canPerformEventHandlerRequests()) {
+          return;
+        }
+        for(var i = 0; i < JSEvents.deferredCalls.length; ++i) {
+          var call = JSEvents.deferredCalls[i];
+          JSEvents.deferredCalls.splice(i, 1);
+          --i;
+          call.targetFunction.apply(this, call.argsList);
+        }
+      },inEventHandler:0,currentEventHandler:null,eventHandlers:[],isInternetExplorer:function () { return navigator.userAgent.indexOf('MSIE') !== -1 || navigator.appVersion.indexOf('Trident/') > 0; },removeAllHandlersOnTarget:function (target, eventTypeString) {
+        for(var i = 0; i < JSEvents.eventHandlers.length; ++i) {
+          if (JSEvents.eventHandlers[i].target == target && 
+            (!eventTypeString || eventTypeString == JSEvents.eventHandlers[i].eventTypeString)) {
+             JSEvents._removeHandler(i--);
+           }
+        }
+      },_removeHandler:function (i) {
+        var h = JSEvents.eventHandlers[i];
+        h.target.removeEventListener(h.eventTypeString, h.eventListenerFunc, h.useCapture);
+        JSEvents.eventHandlers.splice(i, 1);
+      },registerOrRemoveHandler:function (eventHandler) {
+        var jsEventHandler = function jsEventHandler(event) {
+          // Increment nesting count for the event handler.
+          ++JSEvents.inEventHandler;
+          JSEvents.currentEventHandler = eventHandler;
+          // Process any old deferred calls the user has placed.
+          JSEvents.runDeferredCalls();
+          // Process the actual event, calls back to user C code handler.
+          eventHandler.handlerFunc(event);
+          // Process any new deferred calls that were placed right now from this event handler.
+          JSEvents.runDeferredCalls();
+          // Out of event handler - restore nesting count.
+          --JSEvents.inEventHandler;
+        }
+        
+        if (eventHandler.callbackfunc) {
+          eventHandler.eventListenerFunc = jsEventHandler;
+          eventHandler.target.addEventListener(eventHandler.eventTypeString, jsEventHandler, eventHandler.useCapture);
+          JSEvents.eventHandlers.push(eventHandler);
+          JSEvents.registerRemoveEventListeners();
+        } else {
+          for(var i = 0; i < JSEvents.eventHandlers.length; ++i) {
+            if (JSEvents.eventHandlers[i].target == eventHandler.target
+             && JSEvents.eventHandlers[i].eventTypeString == eventHandler.eventTypeString) {
+               JSEvents._removeHandler(i--);
+             }
+          }
+        }
+      },registerKeyEventCallback:function (target, userData, useCapture, callbackfunc, eventTypeId, eventTypeString) {
+        if (!JSEvents.keyEvent) {
+          JSEvents.keyEvent = _malloc( 164 );
+        }
+        var handlerFunc = function(event) {
+          var e = event || window.event;
+          stringToUTF8(e.key ? e.key : "", JSEvents.keyEvent + 0, 32);
+          stringToUTF8(e.code ? e.code : "", JSEvents.keyEvent + 32, 32);
+          HEAP32[(((JSEvents.keyEvent)+(64))>>2)]=e.location;
+          HEAP32[(((JSEvents.keyEvent)+(68))>>2)]=e.ctrlKey;
+          HEAP32[(((JSEvents.keyEvent)+(72))>>2)]=e.shiftKey;
+          HEAP32[(((JSEvents.keyEvent)+(76))>>2)]=e.altKey;
+          HEAP32[(((JSEvents.keyEvent)+(80))>>2)]=e.metaKey;
+          HEAP32[(((JSEvents.keyEvent)+(84))>>2)]=e.repeat;
+          stringToUTF8(e.locale ? e.locale : "", JSEvents.keyEvent + 88, 32);
+          stringToUTF8(e.char ? e.char : "", JSEvents.keyEvent + 120, 32);
+          HEAP32[(((JSEvents.keyEvent)+(152))>>2)]=e.charCode;
+          HEAP32[(((JSEvents.keyEvent)+(156))>>2)]=e.keyCode;
+          HEAP32[(((JSEvents.keyEvent)+(160))>>2)]=e.which;
+          var shouldCancel = Module['dynCall_iiii'](callbackfunc, eventTypeId, JSEvents.keyEvent, userData);
+          if (shouldCancel) {
+            e.preventDefault();
+          }
+        };
+  
+        var eventHandler = {
+          target: JSEvents.findEventTarget(target),
+          allowsDeferredCalls: JSEvents.isInternetExplorer() ? false : true, // MSIE doesn't allow fullscreen and pointerlock requests from key handlers, others do.
+          eventTypeString: eventTypeString,
+          callbackfunc: callbackfunc,
+          handlerFunc: handlerFunc,
+          useCapture: useCapture
+        };
+        JSEvents.registerOrRemoveHandler(eventHandler);
+      },getBoundingClientRectOrZeros:function (target) {
+        return target.getBoundingClientRect ? target.getBoundingClientRect() : { left: 0, top: 0 };
+      },fillMouseEventData:function (eventStruct, e, target) {
+        HEAPF64[((eventStruct)>>3)]=JSEvents.tick();
+        HEAP32[(((eventStruct)+(8))>>2)]=e.screenX;
+        HEAP32[(((eventStruct)+(12))>>2)]=e.screenY;
+        HEAP32[(((eventStruct)+(16))>>2)]=e.clientX;
+        HEAP32[(((eventStruct)+(20))>>2)]=e.clientY;
+        HEAP32[(((eventStruct)+(24))>>2)]=e.ctrlKey;
+        HEAP32[(((eventStruct)+(28))>>2)]=e.shiftKey;
+        HEAP32[(((eventStruct)+(32))>>2)]=e.altKey;
+        HEAP32[(((eventStruct)+(36))>>2)]=e.metaKey;
+        HEAP16[(((eventStruct)+(40))>>1)]=e.button;
+        HEAP16[(((eventStruct)+(42))>>1)]=e.buttons;
+        HEAP32[(((eventStruct)+(44))>>2)]=e["movementX"] || e["mozMovementX"] || e["webkitMovementX"] || (e.screenX-JSEvents.previousScreenX);
+        HEAP32[(((eventStruct)+(48))>>2)]=e["movementY"] || e["mozMovementY"] || e["webkitMovementY"] || (e.screenY-JSEvents.previousScreenY);
+  
+        if (Module['canvas']) {
+          var rect = Module['canvas'].getBoundingClientRect();
+          HEAP32[(((eventStruct)+(60))>>2)]=e.clientX - rect.left;
+          HEAP32[(((eventStruct)+(64))>>2)]=e.clientY - rect.top;
+        } else { // Canvas is not initialized, return 0.
+          HEAP32[(((eventStruct)+(60))>>2)]=0;
+          HEAP32[(((eventStruct)+(64))>>2)]=0;
+        }
+        if (target) {
+          var rect = JSEvents.getBoundingClientRectOrZeros(target);
+          HEAP32[(((eventStruct)+(52))>>2)]=e.clientX - rect.left;
+          HEAP32[(((eventStruct)+(56))>>2)]=e.clientY - rect.top;        
+        } else { // No specific target passed, return 0.
+          HEAP32[(((eventStruct)+(52))>>2)]=0;
+          HEAP32[(((eventStruct)+(56))>>2)]=0;
+        }
+        // wheel and mousewheel events contain wrong screenX/screenY on chrome/opera
+        // https://github.com/kripken/emscripten/pull/4997
+        // https://bugs.chromium.org/p/chromium/issues/detail?id=699956
+        if (e.type !== 'wheel' && e.type !== 'mousewheel') {
+          JSEvents.previousScreenX = e.screenX;
+          JSEvents.previousScreenY = e.screenY;
+        }
+      },registerMouseEventCallback:function (target, userData, useCapture, callbackfunc, eventTypeId, eventTypeString) {
+        if (!JSEvents.mouseEvent) {
+          JSEvents.mouseEvent = _malloc( 72 );
+        }
+        target = JSEvents.findEventTarget(target);
+        var handlerFunc = function(event) {
+          var e = event || window.event;
+          JSEvents.fillMouseEventData(JSEvents.mouseEvent, e, target);
+          var shouldCancel = Module['dynCall_iiii'](callbackfunc, eventTypeId, JSEvents.mouseEvent, userData);
+          if (shouldCancel) {
+            e.preventDefault();
+          }
+        };
+  
+        var eventHandler = {
+          target: target,
+          allowsDeferredCalls: eventTypeString != 'mousemove' && eventTypeString != 'mouseenter' && eventTypeString != 'mouseleave', // Mouse move events do not allow fullscreen/pointer lock requests to be handled in them!
+          eventTypeString: eventTypeString,
+          callbackfunc: callbackfunc,
+          handlerFunc: handlerFunc,
+          useCapture: useCapture
+        };
+        // In IE, mousedown events don't either allow deferred calls to be run!
+        if (JSEvents.isInternetExplorer() && eventTypeString == 'mousedown') eventHandler.allowsDeferredCalls = false;
+        JSEvents.registerOrRemoveHandler(eventHandler);
+      },registerWheelEventCallback:function (target, userData, useCapture, callbackfunc, eventTypeId, eventTypeString) {
+        if (!JSEvents.wheelEvent) {
+          JSEvents.wheelEvent = _malloc( 104 );
+        }
+        target = JSEvents.findEventTarget(target);
+        // The DOM Level 3 events spec event 'wheel'
+        var wheelHandlerFunc = function(event) {
+          var e = event || window.event;
+          JSEvents.fillMouseEventData(JSEvents.wheelEvent, e, target);
+          HEAPF64[(((JSEvents.wheelEvent)+(72))>>3)]=e["deltaX"];
+          HEAPF64[(((JSEvents.wheelEvent)+(80))>>3)]=e["deltaY"];
+          HEAPF64[(((JSEvents.wheelEvent)+(88))>>3)]=e["deltaZ"];
+          HEAP32[(((JSEvents.wheelEvent)+(96))>>2)]=e["deltaMode"];
+          var shouldCancel = Module['dynCall_iiii'](callbackfunc, eventTypeId, JSEvents.wheelEvent, userData);
+          if (shouldCancel) {
+            e.preventDefault();
+          }
+        };
+        // The 'mousewheel' event as implemented in Safari 6.0.5
+        var mouseWheelHandlerFunc = function(event) {
+          var e = event || window.event;
+          JSEvents.fillMouseEventData(JSEvents.wheelEvent, e, target);
+          HEAPF64[(((JSEvents.wheelEvent)+(72))>>3)]=e["wheelDeltaX"] || 0;
+          HEAPF64[(((JSEvents.wheelEvent)+(80))>>3)]=-(e["wheelDeltaY"] ? e["wheelDeltaY"] : e["wheelDelta"]) /* 1. Invert to unify direction with the DOM Level 3 wheel event. 2. MSIE does not provide wheelDeltaY, so wheelDelta is used as a fallback. */;
+          HEAPF64[(((JSEvents.wheelEvent)+(88))>>3)]=0 /* Not available */;
+          HEAP32[(((JSEvents.wheelEvent)+(96))>>2)]=0 /* DOM_DELTA_PIXEL */;
+          var shouldCancel = Module['dynCall_iiii'](callbackfunc, eventTypeId, JSEvents.wheelEvent, userData);
+          if (shouldCancel) {
+            e.preventDefault();
+          }
+        };
+  
+        var eventHandler = {
+          target: target,
+          allowsDeferredCalls: true,
+          eventTypeString: eventTypeString,
+          callbackfunc: callbackfunc,
+          handlerFunc: (eventTypeString == 'wheel') ? wheelHandlerFunc : mouseWheelHandlerFunc,
+          useCapture: useCapture
+        };
+        JSEvents.registerOrRemoveHandler(eventHandler);
+      },pageScrollPos:function () {
+        if (window.pageXOffset > 0 || window.pageYOffset > 0) {
+          return [window.pageXOffset, window.pageYOffset];
+        }
+        if (typeof document.documentElement.scrollLeft !== 'undefined' || typeof document.documentElement.scrollTop !== 'undefined') {
+          return [document.documentElement.scrollLeft, document.documentElement.scrollTop];
+        }
+        return [document.body.scrollLeft|0, document.body.scrollTop|0];
+      },registerUiEventCallback:function (target, userData, useCapture, callbackfunc, eventTypeId, eventTypeString) {
+        if (!JSEvents.uiEvent) {
+          JSEvents.uiEvent = _malloc( 36 );
+        }
+  
+        if (eventTypeString == "scroll" && !target) {
+          target = document; // By default read scroll events on document rather than window.
+        } else {
+          target = JSEvents.findEventTarget(target);
+        }
+  
+        var handlerFunc = function(event) {
+          var e = event || window.event;
+          if (e.target != target) {
+            // Never take ui events such as scroll via a 'bubbled' route, but always from the direct element that
+            // was targeted. Otherwise e.g. if app logs a message in response to a page scroll, the Emscripten log
+            // message box could cause to scroll, generating a new (bubbled) scroll message, causing a new log print,
+            // causing a new scroll, etc..
+            return;
+          }
+          var scrollPos = JSEvents.pageScrollPos();
+          HEAP32[((JSEvents.uiEvent)>>2)]=e.detail;
+          HEAP32[(((JSEvents.uiEvent)+(4))>>2)]=document.body.clientWidth;
+          HEAP32[(((JSEvents.uiEvent)+(8))>>2)]=document.body.clientHeight;
+          HEAP32[(((JSEvents.uiEvent)+(12))>>2)]=window.innerWidth;
+          HEAP32[(((JSEvents.uiEvent)+(16))>>2)]=window.innerHeight;
+          HEAP32[(((JSEvents.uiEvent)+(20))>>2)]=window.outerWidth;
+          HEAP32[(((JSEvents.uiEvent)+(24))>>2)]=window.outerHeight;
+          HEAP32[(((JSEvents.uiEvent)+(28))>>2)]=scrollPos[0];
+          HEAP32[(((JSEvents.uiEvent)+(32))>>2)]=scrollPos[1];
+          var shouldCancel = Module['dynCall_iiii'](callbackfunc, eventTypeId, JSEvents.uiEvent, userData);
+          if (shouldCancel) {
+            e.preventDefault();
+          }
+        };
+  
+        var eventHandler = {
+          target: target,
+          allowsDeferredCalls: false, // Neither scroll or resize events allow running requests inside them.
+          eventTypeString: eventTypeString,
+          callbackfunc: callbackfunc,
+          handlerFunc: handlerFunc,
+          useCapture: useCapture
+        };
+        JSEvents.registerOrRemoveHandler(eventHandler);
+      },getNodeNameForTarget:function (target) {
+        if (!target) return '';
+        if (target == window) return '#window';
+        if (target == window.screen) return '#screen';
+        return (target && target.nodeName) ? target.nodeName : '';
+      },registerFocusEventCallback:function (target, userData, useCapture, callbackfunc, eventTypeId, eventTypeString) {
+        if (!JSEvents.focusEvent) {
+          JSEvents.focusEvent = _malloc( 256 );
+        }
+        var handlerFunc = function(event) {
+          var e = event || window.event;
+  
+          var nodeName = JSEvents.getNodeNameForTarget(e.target);
+          var id = e.target.id ? e.target.id : '';
+          stringToUTF8(nodeName, JSEvents.focusEvent + 0, 128);
+          stringToUTF8(id, JSEvents.focusEvent + 128, 128);
+          var shouldCancel = Module['dynCall_iiii'](callbackfunc, eventTypeId, JSEvents.focusEvent, userData);
+          if (shouldCancel) {
+            e.preventDefault();
+          }
+        };
+  
+        var eventHandler = {
+          target: JSEvents.findEventTarget(target),
+          allowsDeferredCalls: false,
+          eventTypeString: eventTypeString,
+          callbackfunc: callbackfunc,
+          handlerFunc: handlerFunc,
+          useCapture: useCapture
+        };
+        JSEvents.registerOrRemoveHandler(eventHandler);
+      },tick:function () {
+        if (window['performance'] && window['performance']['now']) return window['performance']['now']();
+        else return Date.now();
+      },registerDeviceOrientationEventCallback:function (target, userData, useCapture, callbackfunc, eventTypeId, eventTypeString) {
+        if (!JSEvents.deviceOrientationEvent) {
+          JSEvents.deviceOrientationEvent = _malloc( 40 );
+        }
+        var handlerFunc = function(event) {
+          var e = event || window.event;
+  
+          HEAPF64[((JSEvents.deviceOrientationEvent)>>3)]=JSEvents.tick();
+          HEAPF64[(((JSEvents.deviceOrientationEvent)+(8))>>3)]=e.alpha;
+          HEAPF64[(((JSEvents.deviceOrientationEvent)+(16))>>3)]=e.beta;
+          HEAPF64[(((JSEvents.deviceOrientationEvent)+(24))>>3)]=e.gamma;
+          HEAP32[(((JSEvents.deviceOrientationEvent)+(32))>>2)]=e.absolute;
+  
+          var shouldCancel = Module['dynCall_iiii'](callbackfunc, eventTypeId, JSEvents.deviceOrientationEvent, userData);
+          if (shouldCancel) {
+            e.preventDefault();
+          }
+        };
+  
+        var eventHandler = {
+          target: JSEvents.findEventTarget(target),
+          allowsDeferredCalls: false,
+          eventTypeString: eventTypeString,
+          callbackfunc: callbackfunc,
+          handlerFunc: handlerFunc,
+          useCapture: useCapture
+        };
+        JSEvents.registerOrRemoveHandler(eventHandler);
+      },registerDeviceMotionEventCallback:function (target, userData, useCapture, callbackfunc, eventTypeId, eventTypeString) {
+        if (!JSEvents.deviceMotionEvent) {
+          JSEvents.deviceMotionEvent = _malloc( 80 );
+        }
+        var handlerFunc = function(event) {
+          var e = event || window.event;
+  
+          HEAPF64[((JSEvents.deviceMotionEvent)>>3)]=JSEvents.tick();
+          HEAPF64[(((JSEvents.deviceMotionEvent)+(8))>>3)]=e.acceleration.x;
+          HEAPF64[(((JSEvents.deviceMotionEvent)+(16))>>3)]=e.acceleration.y;
+          HEAPF64[(((JSEvents.deviceMotionEvent)+(24))>>3)]=e.acceleration.z;
+          HEAPF64[(((JSEvents.deviceMotionEvent)+(32))>>3)]=e.accelerationIncludingGravity.x;
+          HEAPF64[(((JSEvents.deviceMotionEvent)+(40))>>3)]=e.accelerationIncludingGravity.y;
+          HEAPF64[(((JSEvents.deviceMotionEvent)+(48))>>3)]=e.accelerationIncludingGravity.z;
+          HEAPF64[(((JSEvents.deviceMotionEvent)+(56))>>3)]=e.rotationRate.alpha;
+          HEAPF64[(((JSEvents.deviceMotionEvent)+(64))>>3)]=e.rotationRate.beta;
+          HEAPF64[(((JSEvents.deviceMotionEvent)+(72))>>3)]=e.rotationRate.gamma;
+  
+          var shouldCancel = Module['dynCall_iiii'](callbackfunc, eventTypeId, JSEvents.deviceMotionEvent, userData);
+          if (shouldCancel) {
+            e.preventDefault();
+          }
+        };
+  
+        var eventHandler = {
+          target: JSEvents.findEventTarget(target),
+          allowsDeferredCalls: false,
+          eventTypeString: eventTypeString,
+          callbackfunc: callbackfunc,
+          handlerFunc: handlerFunc,
+          useCapture: useCapture
+        };
+        JSEvents.registerOrRemoveHandler(eventHandler);
+      },screenOrientation:function () {
+        if (!window.screen) return undefined;
+        return window.screen.orientation || window.screen.mozOrientation || window.screen.webkitOrientation || window.screen.msOrientation;
+      },fillOrientationChangeEventData:function (eventStruct, e) {
+        var orientations  = ["portrait-primary", "portrait-secondary", "landscape-primary", "landscape-secondary"];
+        var orientations2 = ["portrait",         "portrait",           "landscape",         "landscape"];
+  
+        var orientationString = JSEvents.screenOrientation();
+        var orientation = orientations.indexOf(orientationString);
+        if (orientation == -1) {
+          orientation = orientations2.indexOf(orientationString);
+        }
+  
+        HEAP32[((eventStruct)>>2)]=1 << orientation;
+        HEAP32[(((eventStruct)+(4))>>2)]=window.orientation;
+      },registerOrientationChangeEventCallback:function (target, userData, useCapture, callbackfunc, eventTypeId, eventTypeString) {
+        if (!JSEvents.orientationChangeEvent) {
+          JSEvents.orientationChangeEvent = _malloc( 8 );
+        }
+  
+        if (!target) {
+          target = window.screen; // Orientation events need to be captured from 'window.screen' instead of 'window'
+        } else {
+          target = JSEvents.findEventTarget(target);
+        }
+  
+        var handlerFunc = function(event) {
+          var e = event || window.event;
+  
+          JSEvents.fillOrientationChangeEventData(JSEvents.orientationChangeEvent, e);
+  
+          var shouldCancel = Module['dynCall_iiii'](callbackfunc, eventTypeId, JSEvents.orientationChangeEvent, userData);
+          if (shouldCancel) {
+            e.preventDefault();
+          }
+        };
+  
+        if (eventTypeString == "orientationchange" && window.screen.mozOrientation !== undefined) {
+          eventTypeString = "mozorientationchange";
+        }
+  
+        var eventHandler = {
+          target: target,
+          allowsDeferredCalls: false,
+          eventTypeString: eventTypeString,
+          callbackfunc: callbackfunc,
+          handlerFunc: handlerFunc,
+          useCapture: useCapture
+        };
+        JSEvents.registerOrRemoveHandler(eventHandler);
+      },fullscreenEnabled:function () {
+        return document.fullscreenEnabled || document.mozFullScreenEnabled || document.webkitFullscreenEnabled || document.msFullscreenEnabled;
+      },fillFullscreenChangeEventData:function (eventStruct, e) {
+        var fullscreenElement = document.fullscreenElement || document.mozFullScreenElement || document.webkitFullscreenElement || document.msFullscreenElement;
+        var isFullscreen = !!fullscreenElement;
+        HEAP32[((eventStruct)>>2)]=isFullscreen;
+        HEAP32[(((eventStruct)+(4))>>2)]=JSEvents.fullscreenEnabled();
+        // If transitioning to fullscreen, report info about the element that is now fullscreen.
+        // If transitioning to windowed mode, report info about the element that just was fullscreen.
+        var reportedElement = isFullscreen ? fullscreenElement : JSEvents.previousFullscreenElement;
+        var nodeName = JSEvents.getNodeNameForTarget(reportedElement);
+        var id = (reportedElement && reportedElement.id) ? reportedElement.id : '';
+        stringToUTF8(nodeName, eventStruct + 8, 128);
+        stringToUTF8(id, eventStruct + 136, 128);
+        HEAP32[(((eventStruct)+(264))>>2)]=reportedElement ? reportedElement.clientWidth : 0;
+        HEAP32[(((eventStruct)+(268))>>2)]=reportedElement ? reportedElement.clientHeight : 0;
+        HEAP32[(((eventStruct)+(272))>>2)]=screen.width;
+        HEAP32[(((eventStruct)+(276))>>2)]=screen.height;
+        if (isFullscreen) {
+          JSEvents.previousFullscreenElement = fullscreenElement;
+        }
+      },registerFullscreenChangeEventCallback:function (target, userData, useCapture, callbackfunc, eventTypeId, eventTypeString) {
+        if (!JSEvents.fullscreenChangeEvent) {
+          JSEvents.fullscreenChangeEvent = _malloc( 280 );
+        }
+  
+        if (!target) {
+          target = document; // Fullscreen change events need to be captured from 'document' by default instead of 'window'
+        } else {
+          target = JSEvents.findEventTarget(target);
+        }
+  
+        var handlerFunc = function(event) {
+          var e = event || window.event;
+  
+          JSEvents.fillFullscreenChangeEventData(JSEvents.fullscreenChangeEvent, e);
+  
+          var shouldCancel = Module['dynCall_iiii'](callbackfunc, eventTypeId, JSEvents.fullscreenChangeEvent, userData);
+          if (shouldCancel) {
+            e.preventDefault();
+          }
+        };
+  
+        var eventHandler = {
+          target: target,
+          allowsDeferredCalls: false,
+          eventTypeString: eventTypeString,
+          callbackfunc: callbackfunc,
+          handlerFunc: handlerFunc,
+          useCapture: useCapture
+        };
+        JSEvents.registerOrRemoveHandler(eventHandler);
+      },resizeCanvasForFullscreen:function (target, strategy) {
+        var restoreOldStyle = __registerRestoreOldStyle(target);
+        var cssWidth = strategy.softFullscreen ? window.innerWidth : screen.width;
+        var cssHeight = strategy.softFullscreen ? window.innerHeight : screen.height;
+        var rect = target.getBoundingClientRect();
+        var windowedCssWidth = rect.right - rect.left;
+        var windowedCssHeight = rect.bottom - rect.top;
+        var windowedRttWidth = target.width;
+        var windowedRttHeight = target.height;
+  
+        if (strategy.scaleMode == 3) {
+          __setLetterbox(target, (cssHeight - windowedCssHeight) / 2, (cssWidth - windowedCssWidth) / 2);
+          cssWidth = windowedCssWidth;
+          cssHeight = windowedCssHeight;
+        } else if (strategy.scaleMode == 2) {
+          if (cssWidth*windowedRttHeight < windowedRttWidth*cssHeight) {
+            var desiredCssHeight = windowedRttHeight * cssWidth / windowedRttWidth;
+            __setLetterbox(target, (cssHeight - desiredCssHeight) / 2, 0);
+            cssHeight = desiredCssHeight;
+          } else {
+            var desiredCssWidth = windowedRttWidth * cssHeight / windowedRttHeight;
+            __setLetterbox(target, 0, (cssWidth - desiredCssWidth) / 2);
+            cssWidth = desiredCssWidth;
+          }
+        }
+  
+        // If we are adding padding, must choose a background color or otherwise Chrome will give the
+        // padding a default white color. Do it only if user has not customized their own background color.
+        if (!target.style.backgroundColor) target.style.backgroundColor = 'black';
+        // IE11 does the same, but requires the color to be set in the document body.
+        if (!document.body.style.backgroundColor) document.body.style.backgroundColor = 'black'; // IE11
+        // Firefox always shows black letterboxes independent of style color.
+  
+        target.style.width = cssWidth + 'px';
+        target.style.height = cssHeight + 'px';
+  
+        if (strategy.filteringMode == 1) {
+          target.style.imageRendering = 'optimizeSpeed';
+          target.style.imageRendering = '-moz-crisp-edges';
+          target.style.imageRendering = '-o-crisp-edges';
+          target.style.imageRendering = '-webkit-optimize-contrast';
+          target.style.imageRendering = 'optimize-contrast';
+          target.style.imageRendering = 'crisp-edges';
+          target.style.imageRendering = 'pixelated';
+        }
+  
+        var dpiScale = (strategy.canvasResolutionScaleMode == 2) ? window.devicePixelRatio : 1;
+        if (strategy.canvasResolutionScaleMode != 0) {
+          target.width = cssWidth * dpiScale;
+          target.height = cssHeight * dpiScale;
+          if (target.GLctxObject) target.GLctxObject.GLctx.viewport(0, 0, target.width, target.height);
+        }
+        return restoreOldStyle;
+      },requestFullscreen:function (target, strategy) {
+        // EMSCRIPTEN_FULLSCREEN_SCALE_DEFAULT + EMSCRIPTEN_FULLSCREEN_CANVAS_SCALE_NONE is a mode where no extra logic is performed to the DOM elements.
+        if (strategy.scaleMode != 0 || strategy.canvasResolutionScaleMode != 0) {
+          JSEvents.resizeCanvasForFullscreen(target, strategy);
+        }
+  
+        if (target.requestFullscreen) {
+          target.requestFullscreen();
+        } else if (target.msRequestFullscreen) {
+          target.msRequestFullscreen();
+        } else if (target.mozRequestFullScreen) {
+          target.mozRequestFullScreen();
+        } else if (target.mozRequestFullscreen) {
+          target.mozRequestFullscreen();
+        } else if (target.webkitRequestFullscreen) {
+          target.webkitRequestFullscreen(Element.ALLOW_KEYBOARD_INPUT);
+        } else {
+          if (typeof JSEvents.fullscreenEnabled() === 'undefined') {
+            return -1;
+          } else {
+            return -3;
+          }
+        }
+  
+        if (strategy.canvasResizedCallback) {
+          Module['dynCall_iiii'](strategy.canvasResizedCallback, 37, 0, strategy.canvasResizedCallbackUserData);
+        }
+  
+        return 0;
+      },fillPointerlockChangeEventData:function (eventStruct, e) {
+        var pointerLockElement = document.pointerLockElement || document.mozPointerLockElement || document.webkitPointerLockElement || document.msPointerLockElement;
+        var isPointerlocked = !!pointerLockElement;
+        HEAP32[((eventStruct)>>2)]=isPointerlocked;
+        var nodeName = JSEvents.getNodeNameForTarget(pointerLockElement);
+        var id = (pointerLockElement && pointerLockElement.id) ? pointerLockElement.id : '';
+        stringToUTF8(nodeName, eventStruct + 4, 128);
+        stringToUTF8(id, eventStruct + 132, 128);
+      },registerPointerlockChangeEventCallback:function (target, userData, useCapture, callbackfunc, eventTypeId, eventTypeString) {
+        if (!JSEvents.pointerlockChangeEvent) {
+          JSEvents.pointerlockChangeEvent = _malloc( 260 );
+        }
+  
+        if (!target) {
+          target = document; // Pointer lock change events need to be captured from 'document' by default instead of 'window'
+        } else {
+          target = JSEvents.findEventTarget(target);
+        }
+  
+        var handlerFunc = function(event) {
+          var e = event || window.event;
+  
+          JSEvents.fillPointerlockChangeEventData(JSEvents.pointerlockChangeEvent, e);
+  
+          var shouldCancel = Module['dynCall_iiii'](callbackfunc, eventTypeId, JSEvents.pointerlockChangeEvent, userData);
+          if (shouldCancel) {
+            e.preventDefault();
+          }
+        };
+  
+        var eventHandler = {
+          target: target,
+          allowsDeferredCalls: false,
+          eventTypeString: eventTypeString,
+          callbackfunc: callbackfunc,
+          handlerFunc: handlerFunc,
+          useCapture: useCapture
+        };
+        JSEvents.registerOrRemoveHandler(eventHandler);
+      },registerPointerlockErrorEventCallback:function (target, userData, useCapture, callbackfunc, eventTypeId, eventTypeString) {
+        if (!target) {
+          target = document; // Pointer lock events need to be captured from 'document' by default instead of 'window'
+        } else {
+          target = JSEvents.findEventTarget(target);
+        }
+  
+        var handlerFunc = function(event) {
+          var e = event || window.event;
+  
+          var shouldCancel = Module['dynCall_iiii'](callbackfunc, eventTypeId, 0, userData);
+          if (shouldCancel) {
+            e.preventDefault();
+          }
+        };
+  
+        var eventHandler = {
+          target: target,
+          allowsDeferredCalls: false,
+          eventTypeString: eventTypeString,
+          callbackfunc: callbackfunc,
+          handlerFunc: handlerFunc,
+          useCapture: useCapture
+        };
+        JSEvents.registerOrRemoveHandler(eventHandler);
+      },requestPointerLock:function (target) {
+        if (target.requestPointerLock) {
+          target.requestPointerLock();
+        } else if (target.mozRequestPointerLock) {
+          target.mozRequestPointerLock();
+        } else if (target.webkitRequestPointerLock) {
+          target.webkitRequestPointerLock();
+        } else if (target.msRequestPointerLock) {
+          target.msRequestPointerLock();
+        } else {
+          // document.body is known to accept pointer lock, so use that to differentiate if the user passed a bad element,
+          // or if the whole browser just doesn't support the feature.
+          if (document.body.requestPointerLock || document.body.mozRequestPointerLock || document.body.webkitRequestPointerLock || document.body.msRequestPointerLock) {
+            return -3;
+          } else {
+            return -1;
+          }
+        }
+        return 0;
+      },fillVisibilityChangeEventData:function (eventStruct, e) {
+        var visibilityStates = [ "hidden", "visible", "prerender", "unloaded" ];
+        var visibilityState = visibilityStates.indexOf(document.visibilityState);
+  
+        HEAP32[((eventStruct)>>2)]=document.hidden;
+        HEAP32[(((eventStruct)+(4))>>2)]=visibilityState;
+      },registerVisibilityChangeEventCallback:function (target, userData, useCapture, callbackfunc, eventTypeId, eventTypeString) {
+        if (!JSEvents.visibilityChangeEvent) {
+          JSEvents.visibilityChangeEvent = _malloc( 8 );
+        }
+  
+        if (!target) {
+          target = document; // Visibility change events need to be captured from 'document' by default instead of 'window'
+        } else {
+          target = JSEvents.findEventTarget(target);
+        }
+  
+        var handlerFunc = function(event) {
+          var e = event || window.event;
+  
+          JSEvents.fillVisibilityChangeEventData(JSEvents.visibilityChangeEvent, e);
+  
+          var shouldCancel = Module['dynCall_iiii'](callbackfunc, eventTypeId, JSEvents.visibilityChangeEvent, userData);
+          if (shouldCancel) {
+            e.preventDefault();
+          }
+        };
+  
+        var eventHandler = {
+          target: target,
+          allowsDeferredCalls: false,
+          eventTypeString: eventTypeString,
+          callbackfunc: callbackfunc,
+          handlerFunc: handlerFunc,
+          useCapture: useCapture
+        };
+        JSEvents.registerOrRemoveHandler(eventHandler);
+      },registerTouchEventCallback:function (target, userData, useCapture, callbackfunc, eventTypeId, eventTypeString) {
+        if (!JSEvents.touchEvent) {
+          JSEvents.touchEvent = _malloc( 1684 );
+        }
+  
+        target = JSEvents.findEventTarget(target);
+  
+        var handlerFunc = function(event) {
+          var e = event || window.event;
+  
+          var touches = {};
+          for(var i = 0; i < e.touches.length; ++i) {
+            var touch = e.touches[i];
+            touches[touch.identifier] = touch;
+          }
+          for(var i = 0; i < e.changedTouches.length; ++i) {
+            var touch = e.changedTouches[i];
+            touches[touch.identifier] = touch;
+            touch.changed = true;
+          }
+          for(var i = 0; i < e.targetTouches.length; ++i) {
+            var touch = e.targetTouches[i];
+            touches[touch.identifier].onTarget = true;
+          }
+          
+          var ptr = JSEvents.touchEvent;
+          HEAP32[(((ptr)+(4))>>2)]=e.ctrlKey;
+          HEAP32[(((ptr)+(8))>>2)]=e.shiftKey;
+          HEAP32[(((ptr)+(12))>>2)]=e.altKey;
+          HEAP32[(((ptr)+(16))>>2)]=e.metaKey;
+          ptr += 20; // Advance to the start of the touch array.
+          var canvasRect = Module['canvas'] ? Module['canvas'].getBoundingClientRect() : undefined;
+          var targetRect = JSEvents.getBoundingClientRectOrZeros(target);
+          var numTouches = 0;
+          for(var i in touches) {
+            var t = touches[i];
+            HEAP32[((ptr)>>2)]=t.identifier;
+            HEAP32[(((ptr)+(4))>>2)]=t.screenX;
+            HEAP32[(((ptr)+(8))>>2)]=t.screenY;
+            HEAP32[(((ptr)+(12))>>2)]=t.clientX;
+            HEAP32[(((ptr)+(16))>>2)]=t.clientY;
+            HEAP32[(((ptr)+(20))>>2)]=t.pageX;
+            HEAP32[(((ptr)+(24))>>2)]=t.pageY;
+            HEAP32[(((ptr)+(28))>>2)]=t.changed;
+            HEAP32[(((ptr)+(32))>>2)]=t.onTarget;
+            if (canvasRect) {
+              HEAP32[(((ptr)+(44))>>2)]=t.clientX - canvasRect.left;
+              HEAP32[(((ptr)+(48))>>2)]=t.clientY - canvasRect.top;
+            } else {
+              HEAP32[(((ptr)+(44))>>2)]=0;
+              HEAP32[(((ptr)+(48))>>2)]=0;            
+            }
+            HEAP32[(((ptr)+(36))>>2)]=t.clientX - targetRect.left;
+            HEAP32[(((ptr)+(40))>>2)]=t.clientY - targetRect.top;
+            
+            ptr += 52;
+  
+            if (++numTouches >= 32) {
+              break;
+            }
+          }
+          HEAP32[((JSEvents.touchEvent)>>2)]=numTouches;
+  
+          var shouldCancel = Module['dynCall_iiii'](callbackfunc, eventTypeId, JSEvents.touchEvent, userData);
+          if (shouldCancel) {
+            e.preventDefault();
+          }
+        };
+  
+        var eventHandler = {
+          target: target,
+          allowsDeferredCalls: eventTypeString == 'touchstart' || eventTypeString == 'touchend',
+          eventTypeString: eventTypeString,
+          callbackfunc: callbackfunc,
+          handlerFunc: handlerFunc,
+          useCapture: useCapture
+        };
+        JSEvents.registerOrRemoveHandler(eventHandler);
+      },fillGamepadEventData:function (eventStruct, e) {
+        HEAPF64[((eventStruct)>>3)]=e.timestamp;
+        for(var i = 0; i < e.axes.length; ++i) {
+          HEAPF64[(((eventStruct+i*8)+(16))>>3)]=e.axes[i];
+        }
+        for(var i = 0; i < e.buttons.length; ++i) {
+          if (typeof(e.buttons[i]) === 'object') {
+            HEAPF64[(((eventStruct+i*8)+(528))>>3)]=e.buttons[i].value;
+          } else {
+            HEAPF64[(((eventStruct+i*8)+(528))>>3)]=e.buttons[i];
+          }
+        }
+        for(var i = 0; i < e.buttons.length; ++i) {
+          if (typeof(e.buttons[i]) === 'object') {
+            HEAP32[(((eventStruct+i*4)+(1040))>>2)]=e.buttons[i].pressed;
+          } else {
+            HEAP32[(((eventStruct+i*4)+(1040))>>2)]=e.buttons[i] == 1.0;
+          }
+        }
+        HEAP32[(((eventStruct)+(1296))>>2)]=e.connected;
+        HEAP32[(((eventStruct)+(1300))>>2)]=e.index;
+        HEAP32[(((eventStruct)+(8))>>2)]=e.axes.length;
+        HEAP32[(((eventStruct)+(12))>>2)]=e.buttons.length;
+        stringToUTF8(e.id, eventStruct + 1304, 64);
+        stringToUTF8(e.mapping, eventStruct + 1368, 64);
+      },registerGamepadEventCallback:function (target, userData, useCapture, callbackfunc, eventTypeId, eventTypeString) {
+        if (!JSEvents.gamepadEvent) {
+          JSEvents.gamepadEvent = _malloc( 1432 );
+        }
+  
+        var handlerFunc = function(event) {
+          var e = event || window.event;
+  
+          JSEvents.fillGamepadEventData(JSEvents.gamepadEvent, e.gamepad);
+  
+          var shouldCancel = Module['dynCall_iiii'](callbackfunc, eventTypeId, JSEvents.gamepadEvent, userData);
+          if (shouldCancel) {
+            e.preventDefault();
+          }
+        };
+  
+        var eventHandler = {
+          target: JSEvents.findEventTarget(target),
+          allowsDeferredCalls: true,
+          eventTypeString: eventTypeString,
+          callbackfunc: callbackfunc,
+          handlerFunc: handlerFunc,
+          useCapture: useCapture
+        };
+        JSEvents.registerOrRemoveHandler(eventHandler);
+      },registerBeforeUnloadEventCallback:function (target, userData, useCapture, callbackfunc, eventTypeId, eventTypeString) {
+        var handlerFunc = function(event) {
+          var e = event || window.event;
+  
+          var confirmationMessage = Module['dynCall_iiii'](callbackfunc, eventTypeId, 0, userData);
+          
+          if (confirmationMessage) {
+            confirmationMessage = Pointer_stringify(confirmationMessage);
+          }
+          if (confirmationMessage) {
+            e.preventDefault();
+            e.returnValue = confirmationMessage;
+            return confirmationMessage;
+          }
+        };
+  
+        var eventHandler = {
+          target: JSEvents.findEventTarget(target),
+          allowsDeferredCalls: false,
+          eventTypeString: eventTypeString,
+          callbackfunc: callbackfunc,
+          handlerFunc: handlerFunc,
+          useCapture: useCapture
+        };
+        JSEvents.registerOrRemoveHandler(eventHandler);
+      },battery:function () { return navigator.battery || navigator.mozBattery || navigator.webkitBattery; },fillBatteryEventData:function (eventStruct, e) {
+        HEAPF64[((eventStruct)>>3)]=e.chargingTime;
+        HEAPF64[(((eventStruct)+(8))>>3)]=e.dischargingTime;
+        HEAPF64[(((eventStruct)+(16))>>3)]=e.level;
+        HEAP32[(((eventStruct)+(24))>>2)]=e.charging;
+      },registerBatteryEventCallback:function (target, userData, useCapture, callbackfunc, eventTypeId, eventTypeString) {
+        if (!JSEvents.batteryEvent) {
+          JSEvents.batteryEvent = _malloc( 32 );
+        }
+  
+        var handlerFunc = function(event) {
+          var e = event || window.event;
+  
+          JSEvents.fillBatteryEventData(JSEvents.batteryEvent, JSEvents.battery());
+  
+          var shouldCancel = Module['dynCall_iiii'](callbackfunc, eventTypeId, JSEvents.batteryEvent, userData);
+          if (shouldCancel) {
+            e.preventDefault();
+          }
+        };
+  
+        var eventHandler = {
+          target: JSEvents.findEventTarget(target),
+          allowsDeferredCalls: false,
+          eventTypeString: eventTypeString,
+          callbackfunc: callbackfunc,
+          handlerFunc: handlerFunc,
+          useCapture: useCapture
+        };
+        JSEvents.registerOrRemoveHandler(eventHandler);
+      },registerWebGlEventCallback:function (target, userData, useCapture, callbackfunc, eventTypeId, eventTypeString) {
+        if (!target) {
+          target = Module['canvas'];
+        }
+        var handlerFunc = function(event) {
+          var e = event || window.event;
+  
+          var shouldCancel = Module['dynCall_iiii'](callbackfunc, eventTypeId, 0, userData);
+          if (shouldCancel) {
+            e.preventDefault();
+          }
+        };
+  
+        var eventHandler = {
+          target: JSEvents.findEventTarget(target),
+          allowsDeferredCalls: false,
+          eventTypeString: eventTypeString,
+          callbackfunc: callbackfunc,
+          handlerFunc: handlerFunc,
+          useCapture: useCapture
+        };
+        JSEvents.registerOrRemoveHandler(eventHandler);
+      }};function _emscripten_set_mousedown_callback(target, userData, useCapture, callbackfunc) {
+      JSEvents.registerMouseEventCallback(target, userData, useCapture, callbackfunc, 5, "mousedown");
+      return 0;
+    }
+
+  function _emscripten_set_mousemove_callback(target, userData, useCapture, callbackfunc) {
+      JSEvents.registerMouseEventCallback(target, userData, useCapture, callbackfunc, 8, "mousemove");
+      return 0;
+    }
+
+  function _emscripten_set_mouseup_callback(target, userData, useCapture, callbackfunc) {
+      JSEvents.registerMouseEventCallback(target, userData, useCapture, callbackfunc, 6, "mouseup");
+      return 0;
+    }
+
+  
   var GL={counter:1,lastError:0,buffers:[],mappedBuffers:{},programs:[],framebuffers:[],renderbuffers:[],textures:[],uniforms:[],shaders:[],vaos:[],contexts:[],currentContext:null,offscreenCanvases:{},timerQueriesEXT:[],byteSizeByTypeRoot:5120,byteSizeByType:[1,1,2,2,4,4,4,2,3,4,8],programInfos:{},stringCache:{},tempFixedLengthArray:[],packAlignment:4,unpackAlignment:4,init:function () {
         GL.miniTempBuffer = new Float32Array(GL.MINI_TEMP_BUFFER_SIZE);
         for (var i = 0; i < GL.MINI_TEMP_BUFFER_SIZE; i++) {
@@ -7778,14 +8711,6 @@ function copyTempDouble(ptr) {
 
   function _glfwPollEvents() {}
 
-  function _glfwSetCursorPosCallback(winid, cbfun) {
-      GLFW.setCursorPosCallback(winid, cbfun);
-    }
-
-  function _glfwSetMouseButtonCallback(winid, cbfun) {
-      GLFW.setMouseButtonCallback(winid, cbfun);
-    }
-
   function _glfwSwapBuffers(winid) {
       GLFW.swapBuffers(winid);
     }
@@ -7827,6 +8752,7 @@ if (ENVIRONMENT_IS_NODE) {
   } else {
     _emscripten_get_now = Date.now;
   };
+JSEvents.staticInit();;
 var GLctx; GL.init();
 DYNAMICTOP_PTR = staticAlloc(4);
 
@@ -7876,15 +8802,11 @@ function nullFunc_iiii(x) { Module["printErr"]("Invalid function pointer called 
 
 function nullFunc_v(x) { Module["printErr"]("Invalid function pointer called with signature 'v'. Perhaps this is an invalid value (e.g. caused by calling a virtual method on a NULL pointer)? Or calling a function with an incorrect type, which will fail? (it is worth building your source files with -Werror (warnings are errors), as warnings can indicate undefined behavior which can cause this)");  Module["printErr"]("Build with ASSERTIONS=2 for more info.");abort(x) }
 
-function nullFunc_vidd(x) { Module["printErr"]("Invalid function pointer called with signature 'vidd'. Perhaps this is an invalid value (e.g. caused by calling a virtual method on a NULL pointer)? Or calling a function with an incorrect type, which will fail? (it is worth building your source files with -Werror (warnings are errors), as warnings can indicate undefined behavior which can cause this)");  Module["printErr"]("Build with ASSERTIONS=2 for more info.");abort(x) }
-
 function nullFunc_vii(x) { Module["printErr"]("Invalid function pointer called with signature 'vii'. Perhaps this is an invalid value (e.g. caused by calling a virtual method on a NULL pointer)? Or calling a function with an incorrect type, which will fail? (it is worth building your source files with -Werror (warnings are errors), as warnings can indicate undefined behavior which can cause this)");  Module["printErr"]("Build with ASSERTIONS=2 for more info.");abort(x) }
 
-function nullFunc_viiii(x) { Module["printErr"]("Invalid function pointer called with signature 'viiii'. Perhaps this is an invalid value (e.g. caused by calling a virtual method on a NULL pointer)? Or calling a function with an incorrect type, which will fail? (it is worth building your source files with -Werror (warnings are errors), as warnings can indicate undefined behavior which can cause this)");  Module["printErr"]("Build with ASSERTIONS=2 for more info.");abort(x) }
+Module['wasmTableSize'] = 44;
 
-Module['wasmTableSize'] = 76;
-
-Module['wasmMaxTableSize'] = 76;
+Module['wasmMaxTableSize'] = 44;
 
 function invoke_ii(index,a1) {
   try {
@@ -7913,15 +8835,6 @@ function invoke_v(index) {
   }
 }
 
-function invoke_vidd(index,a1,a2,a3) {
-  try {
-    Module["dynCall_vidd"](index,a1,a2,a3);
-  } catch(e) {
-    if (typeof e !== 'number' && e !== 'longjmp') throw e;
-    Module["setThrew"](1, 0);
-  }
-}
-
 function invoke_vii(index,a1,a2) {
   try {
     Module["dynCall_vii"](index,a1,a2);
@@ -7931,18 +8844,9 @@ function invoke_vii(index,a1,a2) {
   }
 }
 
-function invoke_viiii(index,a1,a2,a3,a4) {
-  try {
-    Module["dynCall_viiii"](index,a1,a2,a3,a4);
-  } catch(e) {
-    if (typeof e !== 'number' && e !== 'longjmp') throw e;
-    Module["setThrew"](1, 0);
-  }
-}
-
 Module.asmGlobalArg = {};
 
-Module.asmLibraryArg = { "abort": abort, "assert": assert, "enlargeMemory": enlargeMemory, "getTotalMemory": getTotalMemory, "abortOnCannotGrowMemory": abortOnCannotGrowMemory, "abortStackOverflow": abortStackOverflow, "nullFunc_ii": nullFunc_ii, "nullFunc_iiii": nullFunc_iiii, "nullFunc_v": nullFunc_v, "nullFunc_vidd": nullFunc_vidd, "nullFunc_vii": nullFunc_vii, "nullFunc_viiii": nullFunc_viiii, "invoke_ii": invoke_ii, "invoke_iiii": invoke_iiii, "invoke_v": invoke_v, "invoke_vidd": invoke_vidd, "invoke_vii": invoke_vii, "invoke_viiii": invoke_viiii, "___assert_fail": ___assert_fail, "___lock": ___lock, "___setErrNo": ___setErrNo, "___syscall140": ___syscall140, "___syscall145": ___syscall145, "___syscall146": ___syscall146, "___syscall221": ___syscall221, "___syscall5": ___syscall5, "___syscall54": ___syscall54, "___syscall6": ___syscall6, "___unlock": ___unlock, "_emscripten_get_now": _emscripten_get_now, "_emscripten_memcpy_big": _emscripten_memcpy_big, "_emscripten_set_main_loop": _emscripten_set_main_loop, "_emscripten_set_main_loop_timing": _emscripten_set_main_loop_timing, "_glActiveTexture": _glActiveTexture, "_glAttachShader": _glAttachShader, "_glBindBuffer": _glBindBuffer, "_glBindFramebuffer": _glBindFramebuffer, "_glBindRenderbuffer": _glBindRenderbuffer, "_glBindTexture": _glBindTexture, "_glBlendColor": _glBlendColor, "_glBlendEquationSeparate": _glBlendEquationSeparate, "_glBlendFuncSeparate": _glBlendFuncSeparate, "_glBufferData": _glBufferData, "_glBufferSubData": _glBufferSubData, "_glClear": _glClear, "_glClearColor": _glClearColor, "_glClearDepthf": _glClearDepthf, "_glClearStencil": _glClearStencil, "_glColorMask": _glColorMask, "_glCompileShader": _glCompileShader, "_glCompressedTexImage2D": _glCompressedTexImage2D, "_glCreateProgram": _glCreateProgram, "_glCreateShader": _glCreateShader, "_glCullFace": _glCullFace, "_glDeleteBuffers": _glDeleteBuffers, "_glDeleteFramebuffers": _glDeleteFramebuffers, "_glDeleteProgram": _glDeleteProgram, "_glDeleteRenderbuffers": _glDeleteRenderbuffers, "_glDeleteShader": _glDeleteShader, "_glDeleteTextures": _glDeleteTextures, "_glDepthFunc": _glDepthFunc, "_glDepthMask": _glDepthMask, "_glDisable": _glDisable, "_glDisableVertexAttribArray": _glDisableVertexAttribArray, "_glDrawArrays": _glDrawArrays, "_glDrawArraysInstancedEXT": _glDrawArraysInstancedEXT, "_glDrawElements": _glDrawElements, "_glDrawElementsInstancedEXT": _glDrawElementsInstancedEXT, "_glEnable": _glEnable, "_glEnableVertexAttribArray": _glEnableVertexAttribArray, "_glFrontFace": _glFrontFace, "_glGenBuffers": _glGenBuffers, "_glGenRenderbuffers": _glGenRenderbuffers, "_glGenTextures": _glGenTextures, "_glGetAttribLocation": _glGetAttribLocation, "_glGetError": _glGetError, "_glGetIntegerv": _glGetIntegerv, "_glGetProgramInfoLog": _glGetProgramInfoLog, "_glGetProgramiv": _glGetProgramiv, "_glGetShaderInfoLog": _glGetShaderInfoLog, "_glGetShaderiv": _glGetShaderiv, "_glGetString": _glGetString, "_glGetUniformLocation": _glGetUniformLocation, "_glLinkProgram": _glLinkProgram, "_glPolygonOffset": _glPolygonOffset, "_glRenderbufferStorage": _glRenderbufferStorage, "_glScissor": _glScissor, "_glShaderSource": _glShaderSource, "_glStencilFunc": _glStencilFunc, "_glStencilFuncSeparate": _glStencilFuncSeparate, "_glStencilMask": _glStencilMask, "_glStencilOp": _glStencilOp, "_glStencilOpSeparate": _glStencilOpSeparate, "_glTexImage2D": _glTexImage2D, "_glTexParameteri": _glTexParameteri, "_glUniform1fv": _glUniform1fv, "_glUniform1i": _glUniform1i, "_glUniform2fv": _glUniform2fv, "_glUniform3fv": _glUniform3fv, "_glUniform4fv": _glUniform4fv, "_glUniformMatrix4fv": _glUniformMatrix4fv, "_glUseProgram": _glUseProgram, "_glVertexAttribDivisorEXT": _glVertexAttribDivisorEXT, "_glVertexAttribPointer": _glVertexAttribPointer, "_glViewport": _glViewport, "_glfwCreateWindow": _glfwCreateWindow, "_glfwGetFramebufferSize": _glfwGetFramebufferSize, "_glfwInit": _glfwInit, "_glfwMakeContextCurrent": _glfwMakeContextCurrent, "_glfwPollEvents": _glfwPollEvents, "_glfwSetCursorPosCallback": _glfwSetCursorPosCallback, "_glfwSetMouseButtonCallback": _glfwSetMouseButtonCallback, "_glfwSwapBuffers": _glfwSwapBuffers, "emscriptenWebGLComputeImageSize": emscriptenWebGLComputeImageSize, "emscriptenWebGLGet": emscriptenWebGLGet, "emscriptenWebGLGetTexPixelData": emscriptenWebGLGetTexPixelData, "DYNAMICTOP_PTR": DYNAMICTOP_PTR, "tempDoublePtr": tempDoublePtr, "ABORT": ABORT, "STACKTOP": STACKTOP, "STACK_MAX": STACK_MAX };
+Module.asmLibraryArg = { "abort": abort, "assert": assert, "enlargeMemory": enlargeMemory, "getTotalMemory": getTotalMemory, "abortOnCannotGrowMemory": abortOnCannotGrowMemory, "abortStackOverflow": abortStackOverflow, "nullFunc_ii": nullFunc_ii, "nullFunc_iiii": nullFunc_iiii, "nullFunc_v": nullFunc_v, "nullFunc_vii": nullFunc_vii, "invoke_ii": invoke_ii, "invoke_iiii": invoke_iiii, "invoke_v": invoke_v, "invoke_vii": invoke_vii, "___assert_fail": ___assert_fail, "___lock": ___lock, "___setErrNo": ___setErrNo, "___syscall140": ___syscall140, "___syscall145": ___syscall145, "___syscall146": ___syscall146, "___syscall221": ___syscall221, "___syscall5": ___syscall5, "___syscall54": ___syscall54, "___syscall6": ___syscall6, "___unlock": ___unlock, "_emscripten_get_now": _emscripten_get_now, "_emscripten_memcpy_big": _emscripten_memcpy_big, "_emscripten_set_main_loop": _emscripten_set_main_loop, "_emscripten_set_main_loop_timing": _emscripten_set_main_loop_timing, "_emscripten_set_mousedown_callback": _emscripten_set_mousedown_callback, "_emscripten_set_mousemove_callback": _emscripten_set_mousemove_callback, "_emscripten_set_mouseup_callback": _emscripten_set_mouseup_callback, "_glActiveTexture": _glActiveTexture, "_glAttachShader": _glAttachShader, "_glBindBuffer": _glBindBuffer, "_glBindFramebuffer": _glBindFramebuffer, "_glBindRenderbuffer": _glBindRenderbuffer, "_glBindTexture": _glBindTexture, "_glBlendColor": _glBlendColor, "_glBlendEquationSeparate": _glBlendEquationSeparate, "_glBlendFuncSeparate": _glBlendFuncSeparate, "_glBufferData": _glBufferData, "_glBufferSubData": _glBufferSubData, "_glClear": _glClear, "_glClearColor": _glClearColor, "_glClearDepthf": _glClearDepthf, "_glClearStencil": _glClearStencil, "_glColorMask": _glColorMask, "_glCompileShader": _glCompileShader, "_glCompressedTexImage2D": _glCompressedTexImage2D, "_glCreateProgram": _glCreateProgram, "_glCreateShader": _glCreateShader, "_glCullFace": _glCullFace, "_glDeleteBuffers": _glDeleteBuffers, "_glDeleteFramebuffers": _glDeleteFramebuffers, "_glDeleteProgram": _glDeleteProgram, "_glDeleteRenderbuffers": _glDeleteRenderbuffers, "_glDeleteShader": _glDeleteShader, "_glDeleteTextures": _glDeleteTextures, "_glDepthFunc": _glDepthFunc, "_glDepthMask": _glDepthMask, "_glDisable": _glDisable, "_glDisableVertexAttribArray": _glDisableVertexAttribArray, "_glDrawArrays": _glDrawArrays, "_glDrawArraysInstancedEXT": _glDrawArraysInstancedEXT, "_glDrawElements": _glDrawElements, "_glDrawElementsInstancedEXT": _glDrawElementsInstancedEXT, "_glEnable": _glEnable, "_glEnableVertexAttribArray": _glEnableVertexAttribArray, "_glFrontFace": _glFrontFace, "_glGenBuffers": _glGenBuffers, "_glGenRenderbuffers": _glGenRenderbuffers, "_glGenTextures": _glGenTextures, "_glGetAttribLocation": _glGetAttribLocation, "_glGetError": _glGetError, "_glGetIntegerv": _glGetIntegerv, "_glGetProgramInfoLog": _glGetProgramInfoLog, "_glGetProgramiv": _glGetProgramiv, "_glGetShaderInfoLog": _glGetShaderInfoLog, "_glGetShaderiv": _glGetShaderiv, "_glGetString": _glGetString, "_glGetUniformLocation": _glGetUniformLocation, "_glLinkProgram": _glLinkProgram, "_glPolygonOffset": _glPolygonOffset, "_glRenderbufferStorage": _glRenderbufferStorage, "_glScissor": _glScissor, "_glShaderSource": _glShaderSource, "_glStencilFunc": _glStencilFunc, "_glStencilFuncSeparate": _glStencilFuncSeparate, "_glStencilMask": _glStencilMask, "_glStencilOp": _glStencilOp, "_glStencilOpSeparate": _glStencilOpSeparate, "_glTexImage2D": _glTexImage2D, "_glTexParameteri": _glTexParameteri, "_glUniform1fv": _glUniform1fv, "_glUniform1i": _glUniform1i, "_glUniform2fv": _glUniform2fv, "_glUniform3fv": _glUniform3fv, "_glUniform4fv": _glUniform4fv, "_glUniformMatrix4fv": _glUniformMatrix4fv, "_glUseProgram": _glUseProgram, "_glVertexAttribDivisorEXT": _glVertexAttribDivisorEXT, "_glVertexAttribPointer": _glVertexAttribPointer, "_glViewport": _glViewport, "_glfwCreateWindow": _glfwCreateWindow, "_glfwGetFramebufferSize": _glfwGetFramebufferSize, "_glfwInit": _glfwInit, "_glfwMakeContextCurrent": _glfwMakeContextCurrent, "_glfwPollEvents": _glfwPollEvents, "_glfwSwapBuffers": _glfwSwapBuffers, "emscriptenWebGLComputeImageSize": emscriptenWebGLComputeImageSize, "emscriptenWebGLGet": emscriptenWebGLGet, "emscriptenWebGLGetTexPixelData": emscriptenWebGLGetTexPixelData, "DYNAMICTOP_PTR": DYNAMICTOP_PTR, "tempDoublePtr": tempDoublePtr, "ABORT": ABORT, "STACKTOP": STACKTOP, "STACK_MAX": STACK_MAX };
 // EMSCRIPTEN_START_ASM
 var asm =Module["asm"]// EMSCRIPTEN_END_ASM
 (Module.asmGlobalArg, Module.asmLibraryArg, buffer);
@@ -8121,18 +9025,10 @@ var dynCall_v = Module["dynCall_v"] = function() {
   assert(runtimeInitialized, 'you need to wait for the runtime to be ready (e.g. wait for main() to be called)');
   assert(!runtimeExited, 'the runtime was exited (use NO_EXIT_RUNTIME to keep it alive after main() exits)');
   return Module["asm"]["dynCall_v"].apply(null, arguments) };
-var dynCall_vidd = Module["dynCall_vidd"] = function() {
-  assert(runtimeInitialized, 'you need to wait for the runtime to be ready (e.g. wait for main() to be called)');
-  assert(!runtimeExited, 'the runtime was exited (use NO_EXIT_RUNTIME to keep it alive after main() exits)');
-  return Module["asm"]["dynCall_vidd"].apply(null, arguments) };
 var dynCall_vii = Module["dynCall_vii"] = function() {
   assert(runtimeInitialized, 'you need to wait for the runtime to be ready (e.g. wait for main() to be called)');
   assert(!runtimeExited, 'the runtime was exited (use NO_EXIT_RUNTIME to keep it alive after main() exits)');
   return Module["asm"]["dynCall_vii"].apply(null, arguments) };
-var dynCall_viiii = Module["dynCall_viiii"] = function() {
-  assert(runtimeInitialized, 'you need to wait for the runtime to be ready (e.g. wait for main() to be called)');
-  assert(!runtimeExited, 'the runtime was exited (use NO_EXIT_RUNTIME to keep it alive after main() exits)');
-  return Module["asm"]["dynCall_viiii"].apply(null, arguments) };
 ;
 
 
