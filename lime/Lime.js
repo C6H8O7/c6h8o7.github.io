@@ -33,8 +33,8 @@ Module.expectedDataFileDownloads++;
     } else {
       throw 'using preloaded data can only be done on a web page or in a web worker';
     }
-    var PACKAGE_NAME = 'main.data';
-    var REMOTE_PACKAGE_BASE = 'main.data';
+    var PACKAGE_NAME = '../bin/Lime.data';
+    var REMOTE_PACKAGE_BASE = 'Lime.data';
     if (typeof Module['locateFilePackage'] === 'function' && !Module['locateFile']) {
       Module['locateFile'] = Module['locateFilePackage'];
       Module.printErr('warning: you defined Module.locateFilePackage, that has been renamed to Module.locateFile (using your locateFilePackage for now)');
@@ -171,10 +171,10 @@ Module['FS_createPath']('/', 'data', true, true);
           for (var i = 0; i < files.length; ++i) {
             DataRequest.prototype.requests[files[i].filename].onload();
           }
-              Module['removeRunDependency']('datafile_main.data');
+              Module['removeRunDependency']('datafile_../bin/Lime.data');
 
     };
-    Module['addRunDependency']('datafile_main.data');
+    Module['addRunDependency']('datafile_../bin/Lime.data');
   
     if (!Module.preloadResults) Module.preloadResults = {};
   
@@ -195,7 +195,7 @@ Module['FS_createPath']('/', 'data', true, true);
   }
 
  }
- loadPackage({"files": [{"audio": 0, "start": 0, "crunched": 0, "end": 1094, "filename": "/data/goomba.png"}, {"audio": 0, "start": 1094, "crunched": 0, "end": 640131, "filename": "/data/lime.png"}], "remote_package_size": 640131, "package_uuid": "64cdc4ed-be1f-41bf-8ddd-48c61ef661be"});
+ loadPackage({"files": [{"audio": 0, "start": 0, "crunched": 0, "end": 1094, "filename": "/data/goomba.png"}, {"audio": 0, "start": 1094, "crunched": 0, "end": 640131, "filename": "/data/lime.png"}], "remote_package_size": 640131, "package_uuid": "483f9643-34cf-47d3-be7d-625c78b80bad"});
 
 })();
 
@@ -1619,9 +1619,9 @@ function integrateWasmJS() {
 
   var method = 'native-wasm';
 
-  var wasmTextFile = 'main.wast';
-  var wasmBinaryFile = 'main.wasm';
-  var asmjsCodeFile = 'main.temp.asm.js';
+  var wasmTextFile = 'Lime.wast';
+  var wasmBinaryFile = 'Lime.wasm';
+  var asmjsCodeFile = 'Lime.temp.asm.js';
 
   if (typeof Module['locateFile'] === 'function') {
     if (!isDataURI(wasmTextFile)) {
@@ -1896,7 +1896,7 @@ var ASM_CONSTS = [];
 
 STATIC_BASE = GLOBAL_BASE;
 
-STATICTOP = STATIC_BASE + 16896;
+STATICTOP = STATIC_BASE + 17312;
 /* global initializers */  __ATINIT__.push({ func: function() { __GLOBAL__sub_I_main_cpp() } });
 
 
@@ -1905,7 +1905,7 @@ STATICTOP = STATIC_BASE + 16896;
 
 
 
-var STATIC_BUMP = 16896;
+var STATIC_BUMP = 17312;
 Module["STATIC_BASE"] = STATIC_BASE;
 Module["STATIC_BUMP"] = STATIC_BUMP;
 
@@ -6292,6 +6292,35 @@ function copyTempDouble(ptr) {
 
   function _glCullFace(x0) { GLctx['cullFace'](x0) }
 
+  function _glDeleteBuffers(n, buffers) {
+      for (var i = 0; i < n; i++) {
+        var id = HEAP32[(((buffers)+(i*4))>>2)];
+        var buffer = GL.buffers[id];
+  
+        // From spec: "glDeleteBuffers silently ignores 0's and names that do not
+        // correspond to existing buffer objects."
+        if (!buffer) continue;
+  
+        GLctx.deleteBuffer(buffer);
+        buffer.name = 0;
+        GL.buffers[id] = null;
+  
+        if (id == GL.currArrayBuffer) GL.currArrayBuffer = 0;
+        if (id == GL.currElementArrayBuffer) GL.currElementArrayBuffer = 0;
+      }
+    }
+
+  function _glDeleteFramebuffers(n, framebuffers) {
+      for (var i = 0; i < n; ++i) {
+        var id = HEAP32[(((framebuffers)+(i*4))>>2)];
+        var framebuffer = GL.framebuffers[id];
+        if (!framebuffer) continue; // GL spec: "glDeleteFramebuffers silently ignores 0s and names that do not correspond to existing framebuffer objects".
+        GLctx.deleteFramebuffer(framebuffer);
+        framebuffer.name = 0;
+        GL.framebuffers[id] = null;
+      }
+    }
+
   function _glDeleteProgram(id) {
       if (!id) return;
       var program = GL.programs[id];
@@ -6305,6 +6334,17 @@ function copyTempDouble(ptr) {
       GL.programInfos[id] = null;
     }
 
+  function _glDeleteRenderbuffers(n, renderbuffers) {
+      for (var i = 0; i < n; i++) {
+        var id = HEAP32[(((renderbuffers)+(i*4))>>2)];
+        var renderbuffer = GL.renderbuffers[id];
+        if (!renderbuffer) continue; // GL spec: "glDeleteRenderbuffers silently ignores 0s and names that do not correspond to existing renderbuffer objects".
+        GLctx.deleteRenderbuffer(renderbuffer);
+        renderbuffer.name = 0;
+        GL.renderbuffers[id] = null;
+      }
+    }
+
   function _glDeleteShader(id) {
       if (!id) return;
       var shader = GL.shaders[id];
@@ -6314,6 +6354,17 @@ function copyTempDouble(ptr) {
       }
       GLctx.deleteShader(shader);
       GL.shaders[id] = null;
+    }
+
+  function _glDeleteTextures(n, textures) {
+      for (var i = 0; i < n; i++) {
+        var id = HEAP32[(((textures)+(i*4))>>2)];
+        var texture = GL.textures[id];
+        if (!texture) continue; // GL spec: "glDeleteTextures silently ignores 0s and names that do not correspond to existing textures".
+        GLctx.deleteTexture(texture);
+        texture.name = 0;
+        GL.textures[id] = null;
+      }
     }
 
   function _glDepthFunc(x0) { GLctx['depthFunc'](x0) }
@@ -7679,10 +7730,6 @@ function copyTempDouble(ptr) {
       return GLFW.createWindow(width, height, title, monitor, share);
     }
 
-  function _glfwGetCursorPos(winid, x, y) {
-      GLFW.getCursorPos(winid, x, y);
-    }
-
   function _glfwGetFramebufferSize(winid, width, height) {
       var ww = 0;
       var wh = 0;
@@ -7695,14 +7742,6 @@ function copyTempDouble(ptr) {
   
       setValue(width, ww, 'i32');
       setValue(height, wh, 'i32');
-    }
-
-  function _glfwGetMouseButton(winid, button) {
-      return GLFW.getMouseButton(winid, button);
-    }
-
-  function _glfwGetWindowSize(winid, width, height) {
-      GLFW.getWindowSize(winid, width, height);
     }
 
   function _glfwInit() {
@@ -7739,19 +7778,19 @@ function copyTempDouble(ptr) {
 
   function _glfwPollEvents() {}
 
+  function _glfwSetCursorPosCallback(winid, cbfun) {
+      GLFW.setCursorPosCallback(winid, cbfun);
+    }
+
+  function _glfwSetMouseButtonCallback(winid, cbfun) {
+      GLFW.setMouseButtonCallback(winid, cbfun);
+    }
+
   function _glfwSwapBuffers(winid) {
       GLFW.swapBuffers(winid);
     }
 
-  function _glfwSwapInterval(interval) {
-      interval = Math.abs(interval); // GLFW uses negative values to enable GLX_EXT_swap_control_tear, which we don't have, so just treat negative and positive the same.
-      if (interval == 0) _emscripten_set_main_loop_timing(0/*EM_TIMING_SETTIMEOUT*/, 0);
-      else _emscripten_set_main_loop_timing(1/*EM_TIMING_RAF*/, interval);
-    }
-
    
-
-  var _llvm_pow_f32=Math_pow;
 
   
   function _emscripten_memcpy_big(dest, src, num) {
@@ -7835,19 +7874,17 @@ function nullFunc_ii(x) { Module["printErr"]("Invalid function pointer called wi
 
 function nullFunc_iiii(x) { Module["printErr"]("Invalid function pointer called with signature 'iiii'. Perhaps this is an invalid value (e.g. caused by calling a virtual method on a NULL pointer)? Or calling a function with an incorrect type, which will fail? (it is worth building your source files with -Werror (warnings are errors), as warnings can indicate undefined behavior which can cause this)");  Module["printErr"]("Build with ASSERTIONS=2 for more info.");abort(x) }
 
-function nullFunc_iiiiii(x) { Module["printErr"]("Invalid function pointer called with signature 'iiiiii'. Perhaps this is an invalid value (e.g. caused by calling a virtual method on a NULL pointer)? Or calling a function with an incorrect type, which will fail? (it is worth building your source files with -Werror (warnings are errors), as warnings can indicate undefined behavior which can cause this)");  Module["printErr"]("Build with ASSERTIONS=2 for more info.");abort(x) }
-
 function nullFunc_v(x) { Module["printErr"]("Invalid function pointer called with signature 'v'. Perhaps this is an invalid value (e.g. caused by calling a virtual method on a NULL pointer)? Or calling a function with an incorrect type, which will fail? (it is worth building your source files with -Werror (warnings are errors), as warnings can indicate undefined behavior which can cause this)");  Module["printErr"]("Build with ASSERTIONS=2 for more info.");abort(x) }
+
+function nullFunc_vidd(x) { Module["printErr"]("Invalid function pointer called with signature 'vidd'. Perhaps this is an invalid value (e.g. caused by calling a virtual method on a NULL pointer)? Or calling a function with an incorrect type, which will fail? (it is worth building your source files with -Werror (warnings are errors), as warnings can indicate undefined behavior which can cause this)");  Module["printErr"]("Build with ASSERTIONS=2 for more info.");abort(x) }
 
 function nullFunc_vii(x) { Module["printErr"]("Invalid function pointer called with signature 'vii'. Perhaps this is an invalid value (e.g. caused by calling a virtual method on a NULL pointer)? Or calling a function with an incorrect type, which will fail? (it is worth building your source files with -Werror (warnings are errors), as warnings can indicate undefined behavior which can cause this)");  Module["printErr"]("Build with ASSERTIONS=2 for more info.");abort(x) }
 
-function nullFunc_viii(x) { Module["printErr"]("Invalid function pointer called with signature 'viii'. Perhaps this is an invalid value (e.g. caused by calling a virtual method on a NULL pointer)? Or calling a function with an incorrect type, which will fail? (it is worth building your source files with -Werror (warnings are errors), as warnings can indicate undefined behavior which can cause this)");  Module["printErr"]("Build with ASSERTIONS=2 for more info.");abort(x) }
+function nullFunc_viiii(x) { Module["printErr"]("Invalid function pointer called with signature 'viiii'. Perhaps this is an invalid value (e.g. caused by calling a virtual method on a NULL pointer)? Or calling a function with an incorrect type, which will fail? (it is worth building your source files with -Werror (warnings are errors), as warnings can indicate undefined behavior which can cause this)");  Module["printErr"]("Build with ASSERTIONS=2 for more info.");abort(x) }
 
-function nullFunc_viiiiii(x) { Module["printErr"]("Invalid function pointer called with signature 'viiiiii'. Perhaps this is an invalid value (e.g. caused by calling a virtual method on a NULL pointer)? Or calling a function with an incorrect type, which will fail? (it is worth building your source files with -Werror (warnings are errors), as warnings can indicate undefined behavior which can cause this)");  Module["printErr"]("Build with ASSERTIONS=2 for more info.");abort(x) }
+Module['wasmTableSize'] = 76;
 
-Module['wasmTableSize'] = 100;
-
-Module['wasmMaxTableSize'] = 100;
+Module['wasmMaxTableSize'] = 76;
 
 function invoke_ii(index,a1) {
   try {
@@ -7867,18 +7904,18 @@ function invoke_iiii(index,a1,a2,a3) {
   }
 }
 
-function invoke_iiiiii(index,a1,a2,a3,a4,a5) {
+function invoke_v(index) {
   try {
-    return Module["dynCall_iiiiii"](index,a1,a2,a3,a4,a5);
+    Module["dynCall_v"](index);
   } catch(e) {
     if (typeof e !== 'number' && e !== 'longjmp') throw e;
     Module["setThrew"](1, 0);
   }
 }
 
-function invoke_v(index) {
+function invoke_vidd(index,a1,a2,a3) {
   try {
-    Module["dynCall_v"](index);
+    Module["dynCall_vidd"](index,a1,a2,a3);
   } catch(e) {
     if (typeof e !== 'number' && e !== 'longjmp') throw e;
     Module["setThrew"](1, 0);
@@ -7894,18 +7931,9 @@ function invoke_vii(index,a1,a2) {
   }
 }
 
-function invoke_viii(index,a1,a2,a3) {
+function invoke_viiii(index,a1,a2,a3,a4) {
   try {
-    Module["dynCall_viii"](index,a1,a2,a3);
-  } catch(e) {
-    if (typeof e !== 'number' && e !== 'longjmp') throw e;
-    Module["setThrew"](1, 0);
-  }
-}
-
-function invoke_viiiiii(index,a1,a2,a3,a4,a5,a6) {
-  try {
-    Module["dynCall_viiiiii"](index,a1,a2,a3,a4,a5,a6);
+    Module["dynCall_viiii"](index,a1,a2,a3,a4);
   } catch(e) {
     if (typeof e !== 'number' && e !== 'longjmp') throw e;
     Module["setThrew"](1, 0);
@@ -7914,7 +7942,7 @@ function invoke_viiiiii(index,a1,a2,a3,a4,a5,a6) {
 
 Module.asmGlobalArg = {};
 
-Module.asmLibraryArg = { "abort": abort, "assert": assert, "enlargeMemory": enlargeMemory, "getTotalMemory": getTotalMemory, "abortOnCannotGrowMemory": abortOnCannotGrowMemory, "abortStackOverflow": abortStackOverflow, "nullFunc_ii": nullFunc_ii, "nullFunc_iiii": nullFunc_iiii, "nullFunc_iiiiii": nullFunc_iiiiii, "nullFunc_v": nullFunc_v, "nullFunc_vii": nullFunc_vii, "nullFunc_viii": nullFunc_viii, "nullFunc_viiiiii": nullFunc_viiiiii, "invoke_ii": invoke_ii, "invoke_iiii": invoke_iiii, "invoke_iiiiii": invoke_iiiiii, "invoke_v": invoke_v, "invoke_vii": invoke_vii, "invoke_viii": invoke_viii, "invoke_viiiiii": invoke_viiiiii, "___assert_fail": ___assert_fail, "___lock": ___lock, "___setErrNo": ___setErrNo, "___syscall140": ___syscall140, "___syscall145": ___syscall145, "___syscall146": ___syscall146, "___syscall221": ___syscall221, "___syscall5": ___syscall5, "___syscall54": ___syscall54, "___syscall6": ___syscall6, "___unlock": ___unlock, "_emscripten_get_now": _emscripten_get_now, "_emscripten_memcpy_big": _emscripten_memcpy_big, "_emscripten_set_main_loop": _emscripten_set_main_loop, "_emscripten_set_main_loop_timing": _emscripten_set_main_loop_timing, "_glActiveTexture": _glActiveTexture, "_glAttachShader": _glAttachShader, "_glBindBuffer": _glBindBuffer, "_glBindFramebuffer": _glBindFramebuffer, "_glBindRenderbuffer": _glBindRenderbuffer, "_glBindTexture": _glBindTexture, "_glBlendColor": _glBlendColor, "_glBlendEquationSeparate": _glBlendEquationSeparate, "_glBlendFuncSeparate": _glBlendFuncSeparate, "_glBufferData": _glBufferData, "_glBufferSubData": _glBufferSubData, "_glClear": _glClear, "_glClearColor": _glClearColor, "_glClearDepthf": _glClearDepthf, "_glClearStencil": _glClearStencil, "_glColorMask": _glColorMask, "_glCompileShader": _glCompileShader, "_glCompressedTexImage2D": _glCompressedTexImage2D, "_glCreateProgram": _glCreateProgram, "_glCreateShader": _glCreateShader, "_glCullFace": _glCullFace, "_glDeleteProgram": _glDeleteProgram, "_glDeleteShader": _glDeleteShader, "_glDepthFunc": _glDepthFunc, "_glDepthMask": _glDepthMask, "_glDisable": _glDisable, "_glDisableVertexAttribArray": _glDisableVertexAttribArray, "_glDrawArrays": _glDrawArrays, "_glDrawArraysInstancedEXT": _glDrawArraysInstancedEXT, "_glDrawElements": _glDrawElements, "_glDrawElementsInstancedEXT": _glDrawElementsInstancedEXT, "_glEnable": _glEnable, "_glEnableVertexAttribArray": _glEnableVertexAttribArray, "_glFrontFace": _glFrontFace, "_glGenBuffers": _glGenBuffers, "_glGenRenderbuffers": _glGenRenderbuffers, "_glGenTextures": _glGenTextures, "_glGetAttribLocation": _glGetAttribLocation, "_glGetError": _glGetError, "_glGetIntegerv": _glGetIntegerv, "_glGetProgramInfoLog": _glGetProgramInfoLog, "_glGetProgramiv": _glGetProgramiv, "_glGetShaderInfoLog": _glGetShaderInfoLog, "_glGetShaderiv": _glGetShaderiv, "_glGetString": _glGetString, "_glGetUniformLocation": _glGetUniformLocation, "_glLinkProgram": _glLinkProgram, "_glPolygonOffset": _glPolygonOffset, "_glRenderbufferStorage": _glRenderbufferStorage, "_glScissor": _glScissor, "_glShaderSource": _glShaderSource, "_glStencilFunc": _glStencilFunc, "_glStencilFuncSeparate": _glStencilFuncSeparate, "_glStencilMask": _glStencilMask, "_glStencilOp": _glStencilOp, "_glStencilOpSeparate": _glStencilOpSeparate, "_glTexImage2D": _glTexImage2D, "_glTexParameteri": _glTexParameteri, "_glUniform1fv": _glUniform1fv, "_glUniform1i": _glUniform1i, "_glUniform2fv": _glUniform2fv, "_glUniform3fv": _glUniform3fv, "_glUniform4fv": _glUniform4fv, "_glUniformMatrix4fv": _glUniformMatrix4fv, "_glUseProgram": _glUseProgram, "_glVertexAttribDivisorEXT": _glVertexAttribDivisorEXT, "_glVertexAttribPointer": _glVertexAttribPointer, "_glViewport": _glViewport, "_glfwCreateWindow": _glfwCreateWindow, "_glfwGetCursorPos": _glfwGetCursorPos, "_glfwGetFramebufferSize": _glfwGetFramebufferSize, "_glfwGetMouseButton": _glfwGetMouseButton, "_glfwGetWindowSize": _glfwGetWindowSize, "_glfwInit": _glfwInit, "_glfwMakeContextCurrent": _glfwMakeContextCurrent, "_glfwPollEvents": _glfwPollEvents, "_glfwSwapBuffers": _glfwSwapBuffers, "_glfwSwapInterval": _glfwSwapInterval, "_llvm_pow_f32": _llvm_pow_f32, "emscriptenWebGLComputeImageSize": emscriptenWebGLComputeImageSize, "emscriptenWebGLGet": emscriptenWebGLGet, "emscriptenWebGLGetTexPixelData": emscriptenWebGLGetTexPixelData, "DYNAMICTOP_PTR": DYNAMICTOP_PTR, "tempDoublePtr": tempDoublePtr, "ABORT": ABORT, "STACKTOP": STACKTOP, "STACK_MAX": STACK_MAX };
+Module.asmLibraryArg = { "abort": abort, "assert": assert, "enlargeMemory": enlargeMemory, "getTotalMemory": getTotalMemory, "abortOnCannotGrowMemory": abortOnCannotGrowMemory, "abortStackOverflow": abortStackOverflow, "nullFunc_ii": nullFunc_ii, "nullFunc_iiii": nullFunc_iiii, "nullFunc_v": nullFunc_v, "nullFunc_vidd": nullFunc_vidd, "nullFunc_vii": nullFunc_vii, "nullFunc_viiii": nullFunc_viiii, "invoke_ii": invoke_ii, "invoke_iiii": invoke_iiii, "invoke_v": invoke_v, "invoke_vidd": invoke_vidd, "invoke_vii": invoke_vii, "invoke_viiii": invoke_viiii, "___assert_fail": ___assert_fail, "___lock": ___lock, "___setErrNo": ___setErrNo, "___syscall140": ___syscall140, "___syscall145": ___syscall145, "___syscall146": ___syscall146, "___syscall221": ___syscall221, "___syscall5": ___syscall5, "___syscall54": ___syscall54, "___syscall6": ___syscall6, "___unlock": ___unlock, "_emscripten_get_now": _emscripten_get_now, "_emscripten_memcpy_big": _emscripten_memcpy_big, "_emscripten_set_main_loop": _emscripten_set_main_loop, "_emscripten_set_main_loop_timing": _emscripten_set_main_loop_timing, "_glActiveTexture": _glActiveTexture, "_glAttachShader": _glAttachShader, "_glBindBuffer": _glBindBuffer, "_glBindFramebuffer": _glBindFramebuffer, "_glBindRenderbuffer": _glBindRenderbuffer, "_glBindTexture": _glBindTexture, "_glBlendColor": _glBlendColor, "_glBlendEquationSeparate": _glBlendEquationSeparate, "_glBlendFuncSeparate": _glBlendFuncSeparate, "_glBufferData": _glBufferData, "_glBufferSubData": _glBufferSubData, "_glClear": _glClear, "_glClearColor": _glClearColor, "_glClearDepthf": _glClearDepthf, "_glClearStencil": _glClearStencil, "_glColorMask": _glColorMask, "_glCompileShader": _glCompileShader, "_glCompressedTexImage2D": _glCompressedTexImage2D, "_glCreateProgram": _glCreateProgram, "_glCreateShader": _glCreateShader, "_glCullFace": _glCullFace, "_glDeleteBuffers": _glDeleteBuffers, "_glDeleteFramebuffers": _glDeleteFramebuffers, "_glDeleteProgram": _glDeleteProgram, "_glDeleteRenderbuffers": _glDeleteRenderbuffers, "_glDeleteShader": _glDeleteShader, "_glDeleteTextures": _glDeleteTextures, "_glDepthFunc": _glDepthFunc, "_glDepthMask": _glDepthMask, "_glDisable": _glDisable, "_glDisableVertexAttribArray": _glDisableVertexAttribArray, "_glDrawArrays": _glDrawArrays, "_glDrawArraysInstancedEXT": _glDrawArraysInstancedEXT, "_glDrawElements": _glDrawElements, "_glDrawElementsInstancedEXT": _glDrawElementsInstancedEXT, "_glEnable": _glEnable, "_glEnableVertexAttribArray": _glEnableVertexAttribArray, "_glFrontFace": _glFrontFace, "_glGenBuffers": _glGenBuffers, "_glGenRenderbuffers": _glGenRenderbuffers, "_glGenTextures": _glGenTextures, "_glGetAttribLocation": _glGetAttribLocation, "_glGetError": _glGetError, "_glGetIntegerv": _glGetIntegerv, "_glGetProgramInfoLog": _glGetProgramInfoLog, "_glGetProgramiv": _glGetProgramiv, "_glGetShaderInfoLog": _glGetShaderInfoLog, "_glGetShaderiv": _glGetShaderiv, "_glGetString": _glGetString, "_glGetUniformLocation": _glGetUniformLocation, "_glLinkProgram": _glLinkProgram, "_glPolygonOffset": _glPolygonOffset, "_glRenderbufferStorage": _glRenderbufferStorage, "_glScissor": _glScissor, "_glShaderSource": _glShaderSource, "_glStencilFunc": _glStencilFunc, "_glStencilFuncSeparate": _glStencilFuncSeparate, "_glStencilMask": _glStencilMask, "_glStencilOp": _glStencilOp, "_glStencilOpSeparate": _glStencilOpSeparate, "_glTexImage2D": _glTexImage2D, "_glTexParameteri": _glTexParameteri, "_glUniform1fv": _glUniform1fv, "_glUniform1i": _glUniform1i, "_glUniform2fv": _glUniform2fv, "_glUniform3fv": _glUniform3fv, "_glUniform4fv": _glUniform4fv, "_glUniformMatrix4fv": _glUniformMatrix4fv, "_glUseProgram": _glUseProgram, "_glVertexAttribDivisorEXT": _glVertexAttribDivisorEXT, "_glVertexAttribPointer": _glVertexAttribPointer, "_glViewport": _glViewport, "_glfwCreateWindow": _glfwCreateWindow, "_glfwGetFramebufferSize": _glfwGetFramebufferSize, "_glfwInit": _glfwInit, "_glfwMakeContextCurrent": _glfwMakeContextCurrent, "_glfwPollEvents": _glfwPollEvents, "_glfwSetCursorPosCallback": _glfwSetCursorPosCallback, "_glfwSetMouseButtonCallback": _glfwSetMouseButtonCallback, "_glfwSwapBuffers": _glfwSwapBuffers, "emscriptenWebGLComputeImageSize": emscriptenWebGLComputeImageSize, "emscriptenWebGLGet": emscriptenWebGLGet, "emscriptenWebGLGetTexPixelData": emscriptenWebGLGetTexPixelData, "DYNAMICTOP_PTR": DYNAMICTOP_PTR, "tempDoublePtr": tempDoublePtr, "ABORT": ABORT, "STACKTOP": STACKTOP, "STACK_MAX": STACK_MAX };
 // EMSCRIPTEN_START_ASM
 var asm =Module["asm"]// EMSCRIPTEN_END_ASM
 (Module.asmGlobalArg, Module.asmLibraryArg, buffer);
@@ -8089,26 +8117,22 @@ var dynCall_iiii = Module["dynCall_iiii"] = function() {
   assert(runtimeInitialized, 'you need to wait for the runtime to be ready (e.g. wait for main() to be called)');
   assert(!runtimeExited, 'the runtime was exited (use NO_EXIT_RUNTIME to keep it alive after main() exits)');
   return Module["asm"]["dynCall_iiii"].apply(null, arguments) };
-var dynCall_iiiiii = Module["dynCall_iiiiii"] = function() {
-  assert(runtimeInitialized, 'you need to wait for the runtime to be ready (e.g. wait for main() to be called)');
-  assert(!runtimeExited, 'the runtime was exited (use NO_EXIT_RUNTIME to keep it alive after main() exits)');
-  return Module["asm"]["dynCall_iiiiii"].apply(null, arguments) };
 var dynCall_v = Module["dynCall_v"] = function() {
   assert(runtimeInitialized, 'you need to wait for the runtime to be ready (e.g. wait for main() to be called)');
   assert(!runtimeExited, 'the runtime was exited (use NO_EXIT_RUNTIME to keep it alive after main() exits)');
   return Module["asm"]["dynCall_v"].apply(null, arguments) };
+var dynCall_vidd = Module["dynCall_vidd"] = function() {
+  assert(runtimeInitialized, 'you need to wait for the runtime to be ready (e.g. wait for main() to be called)');
+  assert(!runtimeExited, 'the runtime was exited (use NO_EXIT_RUNTIME to keep it alive after main() exits)');
+  return Module["asm"]["dynCall_vidd"].apply(null, arguments) };
 var dynCall_vii = Module["dynCall_vii"] = function() {
   assert(runtimeInitialized, 'you need to wait for the runtime to be ready (e.g. wait for main() to be called)');
   assert(!runtimeExited, 'the runtime was exited (use NO_EXIT_RUNTIME to keep it alive after main() exits)');
   return Module["asm"]["dynCall_vii"].apply(null, arguments) };
-var dynCall_viii = Module["dynCall_viii"] = function() {
+var dynCall_viiii = Module["dynCall_viiii"] = function() {
   assert(runtimeInitialized, 'you need to wait for the runtime to be ready (e.g. wait for main() to be called)');
   assert(!runtimeExited, 'the runtime was exited (use NO_EXIT_RUNTIME to keep it alive after main() exits)');
-  return Module["asm"]["dynCall_viii"].apply(null, arguments) };
-var dynCall_viiiiii = Module["dynCall_viiiiii"] = function() {
-  assert(runtimeInitialized, 'you need to wait for the runtime to be ready (e.g. wait for main() to be called)');
-  assert(!runtimeExited, 'the runtime was exited (use NO_EXIT_RUNTIME to keep it alive after main() exits)');
-  return Module["asm"]["dynCall_viiiiii"].apply(null, arguments) };
+  return Module["asm"]["dynCall_viiii"].apply(null, arguments) };
 ;
 
 
