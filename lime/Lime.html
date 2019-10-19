@@ -5,9 +5,8 @@
 	<style>
 	body {
 		margin: 0;
-		background-color: #292d3e
+		background-color: black;
 	}
-	/* the emscripten canvas must not have any border or padding, or mouse coords will be wrong */
 	.game {
 		position: absolute;
 		top: 0px;
@@ -46,7 +45,7 @@
 			console.error(text);
 		},
 		canvas: (function() {
-			var canvas = document.getElementById('canvas');
+			var canvas = document.querySelector('canvas');
 			canvas.addEventListener("webglcontextlost", function(e) { alert('FIXME: WebGL context lost, please reload the page'); e.preventDefault(); }, false);
 			return canvas;
 		})(),
