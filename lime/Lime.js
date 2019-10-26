@@ -194,7 +194,7 @@ Module['FS_createPath']('/', 'data', true, true);
   }
 
  }
- loadPackage({"files": [{"start": 0, "audio": 0, "end": 16372, "filename": "/data/black.png"}, {"start": 16372, "audio": 0, "end": 16657, "filename": "/data/frag.glsl"}, {"start": 16657, "audio": 0, "end": 17751, "filename": "/data/goomba.png"}, {"start": 17751, "audio": 0, "end": 150128, "filename": "/data/lemongrab.png"}, {"start": 150128, "audio": 0, "end": 789165, "filename": "/data/lime.png"}, {"start": 789165, "audio": 0, "end": 1037446, "filename": "/data/monkey.obj"}, {"start": 1037446, "audio": 0, "end": 1037800, "filename": "/data/vert.glsl"}], "remote_package_size": 1037800, "package_uuid": "f9f9c971-79bf-4d17-8c92-4a4f0819580d"});
+ loadPackage({"files": [{"start": 0, "audio": 0, "end": 16372, "filename": "/data/black.png"}, {"start": 16372, "audio": 0, "end": 16657, "filename": "/data/frag.glsl"}, {"start": 16657, "audio": 0, "end": 17751, "filename": "/data/goomba.png"}, {"start": 17751, "audio": 0, "end": 150128, "filename": "/data/lemongrab.png"}, {"start": 150128, "audio": 0, "end": 789165, "filename": "/data/lime.png"}, {"start": 789165, "audio": 0, "end": 1037446, "filename": "/data/monkey.obj"}, {"start": 1037446, "audio": 0, "end": 1037800, "filename": "/data/vert.glsl"}], "remote_package_size": 1037800, "package_uuid": "ada4ad59-b5cf-4460-817d-f0edf58905c8"});
 
 })();
 
