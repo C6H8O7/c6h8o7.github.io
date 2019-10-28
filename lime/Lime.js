@@ -194,7 +194,7 @@ Module['FS_createPath']('/', 'data', true, true);
   }
 
  }
- loadPackage({"files": [{"start": 0, "audio": 0, "end": 16372, "filename": "/data/black.png"}, {"start": 16372, "audio": 0, "end": 16647, "filename": "/data/frag.glsl"}, {"start": 16647, "audio": 0, "end": 17741, "filename": "/data/goomba.png"}, {"start": 17741, "audio": 0, "end": 150118, "filename": "/data/lemongrab.png"}, {"start": 150118, "audio": 0, "end": 789155, "filename": "/data/lime.png"}, {"start": 789155, "audio": 0, "end": 1037436, "filename": "/data/monkey.obj"}, {"start": 1037436, "audio": 0, "end": 1037790, "filename": "/data/vert.glsl"}], "remote_package_size": 1037790, "package_uuid": "340ea1c2-dc0e-43c7-a8f8-fd59827c985f"});
+ loadPackage({"files": [{"start": 0, "audio": 0, "end": 16372, "filename": "/data/black.png"}, {"start": 16372, "audio": 0, "end": 16647, "filename": "/data/frag.glsl"}, {"start": 16647, "audio": 0, "end": 17741, "filename": "/data/goomba.png"}, {"start": 17741, "audio": 0, "end": 150118, "filename": "/data/lemongrab.png"}, {"start": 150118, "audio": 0, "end": 789155, "filename": "/data/lime.png"}, {"start": 789155, "audio": 0, "end": 1037436, "filename": "/data/monkey.obj"}, {"start": 1037436, "audio": 0, "end": 1037790, "filename": "/data/vert.glsl"}], "remote_package_size": 1037790, "package_uuid": "9787aeb2-8756-4ab7-bcaa-f7598bd979d0"});
 
 })();
 
@@ -1397,11 +1397,11 @@ function updateGlobalBufferAndViews(buf) {
 }
 
 var STATIC_BASE = 1024,
-    STACK_BASE = 133728,
+    STACK_BASE = 133936,
     STACKTOP = STACK_BASE,
-    STACK_MAX = 5376608,
-    DYNAMIC_BASE = 5376608,
-    DYNAMICTOP_PTR = 133536;
+    STACK_MAX = 5376816,
+    DYNAMIC_BASE = 5376816,
+    DYNAMICTOP_PTR = 133744;
 
 assert(STACK_BASE % 16 === 0, 'stack must start aligned');
 assert(DYNAMIC_BASE % 16 === 0, 'heap must start aligned');
@@ -1923,7 +1923,7 @@ function _sapp_js_unfocus_textfield(){ document.getElementById("_sokol_app_input
 
 
 
-// STATICTOP = STATIC_BASE + 132704;
+// STATICTOP = STATIC_BASE + 132912;
 /* global initializers */  __ATINIT__.push({ func: function() { ___emscripten_environ_constructor() } });
 
 
@@ -1934,7 +1934,7 @@ function _sapp_js_unfocus_textfield(){ document.getElementById("_sokol_app_input
 
 
 /* no memory initializer */
-var tempDoublePtr = 133712
+var tempDoublePtr = 133920
 assert(tempDoublePtr % 8 == 0);
 
 function copyTempFloat(ptr) { // functions, because inlining this code increases code size too much
