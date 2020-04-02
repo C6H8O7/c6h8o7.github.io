@@ -1,5 +1,5 @@
-const serverUri = "ws://home.marcolorenzo.com:3024";
-//const serverUri = "ws://127.0.0.1:3024";
+const serverUri = "wss://home.marcolorenzo.com:3024";
+//const serverUri = "wss://127.0.0.1:3024";
 
 let netIO = new NetIO(serverUri);
 netIO.waitForConnection(function () { netIO.send('{"t":"r"}'); })
