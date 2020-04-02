@@ -5,4 +5,4 @@ author: "Marco"
 permalink: /about/
 ---
 
-This is cool.
+This is cool. 
