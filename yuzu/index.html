@@ -1,25 +1,28 @@
 <!DOCTYPE html>
-<html>
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-	<style>
-	* {
-		margin: 0;
-		padding: 0; 
-	}
-	
-	canvas {
-		width: 100%!important;
-		height: 100%!important;
-		position: absolute; 
-	}
-	</style>
-  </head>
-  <body>
-    <script type="module">
-      import init from "./yuzu.js"; // Change this file to the name of the example you are using
-      init();
-    </script>
-  </body>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>yuzu</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0; 
+        }
+        canvas {
+            width: 100%!important;
+            height: 100%!important;
+            position: absolute; 
+        }
+    </style>
+</head>
+<body id="wasm-yuzu">
+  <canvas id="canvas"></canvas>
+  <script type="module">
+      import init from "yuzu.js";
+      init().then(() => {
+          console.log("WASM Loaded");
+      });
+  </script>
+</body>
 </html>
