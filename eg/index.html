@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Video Access</title>
+    <!-- Tailwind CSS -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
+    <!-- Animate.css -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css"/>
+    <style>
+        body {
+            background-color: #121212;
+        }
+        .hidden {
+            display: none;
+        }
+        @keyframes blink {
+            0%, 50%, 100% { opacity: 1; }
+            25%, 75% { opacity: 0; }
+        }
+        .animate__blink {
+            animation: blink 1s ease-in-out;
+        }
+    </style>
+</head>
+<body class="flex items-center justify-center min-h-screen text-white">
+
+<div id="container" class="container bg-gray-800 p-6 rounded-lg shadow-lg text-center animate__animated animate__fadeIn">
+    <h1 id="passwordLabel" class="text-2xl mb-4">Entrez lé mot dé passe</h1>
+    <form id="passwordForm" class="space-y-4">
+        <input type="password" id="password" placeholder="Mot dé passe" class="w-full p-3 rounded border border-gray-600 bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+        <input type="submit" value="Valider" class="w-full p-3 rounded bg-blue-500 hover:bg-blue-700 transition-colors duration-300 cursor-pointer text-white">
+    </form>
+    <div id="congratulations" class="hidden mt-6 animate__animated animate__fadeIn">
+        <h2 class="text-2xl mb-4">Felicitaciones ! Le cadeau sé trouve en el video :)</h2>
+    </div>
+    <div id="videoContainer" class="hidden mt-6 animate__animated animate__fadeIn">
+        <video controls class="w-full rounded">
+            <source src="your-video-file.mp4" type="video/mp4">
+            Your browser does not support the video tag.
+        </video>
+    </div>
+</div>
+
+<script>
+    document.getElementById('passwordForm').addEventListener('submit', function(event) {
+        event.preventDefault();
+        const password = document.getElementById('password').value;
+        const correctPassword = 'berthom';
+
+        if (password === correctPassword) {
+            const congratulations = document.getElementById('congratulations');
+            const videoContainer = document.getElementById('videoContainer');
+            const passwordForm = document.getElementById('passwordForm');
+            const passwordLabel = document.getElementById('passwordLabel');
+
+            passwordForm.classList.add('hidden');
+            passwordLabel.classList.add('hidden');
+            congratulations.classList.remove('hidden');
+
+            setTimeout(() => {
+                congratulations.classList.add('hidden');
+                videoContainer.classList.remove('hidden');
+            }, 4000);
+        } else {
+            const container = document.getElementById('container');
+            container.classList.remove('animate__blink'); // Remove the class to reset animation
+            void container.offsetWidth; // Trigger reflow to restart animation
+            container.classList.add('animate__blink'); // Re-add the class to trigger animation
+        }
+    });
+</script>
+
+</body>
+</html>
