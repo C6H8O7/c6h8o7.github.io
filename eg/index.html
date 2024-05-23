@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Video Access</title>
+    <title>Lé cadeau dé anniversaire</title>
     <!-- Tailwind CSS -->
     <link href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
     <!-- Animate.css -->
@@ -26,7 +26,7 @@
 </head>
 <body class="flex items-center justify-center min-h-screen text-white">
 
-<div id="container" class="container bg-gray-800 p-6 rounded-lg shadow-lg text-center animate__animated animate__fadeIn">
+<div id="container" class="container bg-gray-800 p-6 rounded-lg shadow-lg max-h-screen text-center animate__animated animate__fadeIn">
     <h1 id="passwordLabel" class="text-2xl mb-4">Entrez lé mot dé passe</h1>
     <form id="passwordForm" class="space-y-4">
         <input type="password" id="password" placeholder="Mot dé passe" class="w-full p-3 rounded border border-gray-600 bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500">
@@ -35,8 +35,8 @@
     <div id="congratulations" class="hidden mt-6 animate__animated animate__fadeIn">
         <h2 class="text-2xl mb-4">Felicitaciones ! Le cadeau sé trouve en el video :)</h2>
     </div>
-    <div id="videoContainer" class="hidden mt-6 animate__animated animate__fadeIn">
-        <video controls class="w-full rounded">
+    <div id="videoContainer" class="hidden -m-6 animate__animated animate__fadeIn">
+        <video controls class="w-full max-h-screen rounded">
             <source src="video.mp4" type="video/mp4">
             Your browser does not support the video tag.
         </video>
@@ -47,7 +47,7 @@
     document.getElementById('passwordForm').addEventListener('submit', function(event) {
         event.preventDefault();
         const password = document.getElementById('password').value;
-        const correctPassword = 'berthom';
+        const correctPassword = 'berthom'; // Set your password here
 
         if (password === correctPassword) {
             const congratulations = document.getElementById('congratulations');
@@ -62,7 +62,7 @@
             setTimeout(() => {
                 congratulations.classList.add('hidden');
                 videoContainer.classList.remove('hidden');
-            }, 4000);
+            }, 4000); // Show congratulations message for 2 seconds
         } else {
             const container = document.getElementById('container');
             container.classList.remove('animate__blink'); // Remove the class to reset animation
