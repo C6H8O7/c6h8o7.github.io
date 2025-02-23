@@ -31,7 +31,7 @@ if (ENVIRONMENT_IS_NODE) {
 
 // --pre-jses are emitted after the Module integration code, so that they can
 // refer to Module (if they choose; they can also define Module)
-// include: C:\Users\marco\AppData\Local\Temp\tmpg8xlbn7a.js
+// include: C:\Users\marco\AppData\Local\Temp\tmpmgronkev.js
 
   Module['expectedDataFileDownloads'] ??= 0;
   Module['expectedDataFileDownloads']++;
@@ -208,25 +208,25 @@ Module['FS_createPath']("/", "data", true, true);
     }
 
     }
-    loadPackage({"files": [{"filename": "/data/shader.wgsl", "start": 0, "end": 899}, {"filename": "/data/vox.wgsl", "start": 899, "end": 9628}], "remote_package_size": 9628});
+    loadPackage({"files": [{"filename": "/data/shader.wgsl", "start": 0, "end": 917}, {"filename": "/data/vox.wgsl", "start": 917, "end": 9661}], "remote_package_size": 9661});
 
   })();
 
-// end include: C:\Users\marco\AppData\Local\Temp\tmpg8xlbn7a.js
-// include: C:\Users\marco\AppData\Local\Temp\tmphekxmywy.js
+// end include: C:\Users\marco\AppData\Local\Temp\tmpmgronkev.js
+// include: C:\Users\marco\AppData\Local\Temp\tmpdppqu17f.js
 
     // All the pre-js content up to here must remain later on, we need to run
     // it.
     if (Module['$ww'] || (typeof ENVIRONMENT_IS_PTHREAD != 'undefined' && ENVIRONMENT_IS_PTHREAD)) Module['preRun'] = [];
     var necessaryPreJSTasks = Module['preRun'].slice();
-  // end include: C:\Users\marco\AppData\Local\Temp\tmphekxmywy.js
-// include: C:\Users\marco\AppData\Local\Temp\tmp1f8h3qer.js
+  // end include: C:\Users\marco\AppData\Local\Temp\tmpdppqu17f.js
+// include: C:\Users\marco\AppData\Local\Temp\tmpi1syck7i.js
 
     if (!Module['preRun']) throw 'Module.preRun should exist because file support used it; did a pre-js delete it?';
     necessaryPreJSTasks.forEach((task) => {
       if (Module['preRun'].indexOf(task) < 0) throw 'All preRun tasks that exist before user pre-js code should remain after; did you replace Module or modify Module.preRun?';
     });
-  // end include: C:\Users\marco\AppData\Local\Temp\tmp1f8h3qer.js
+  // end include: C:\Users\marco\AppData\Local\Temp\tmpi1syck7i.js
 
 
 // Sometimes an existing Module object exists with properties
