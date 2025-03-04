@@ -31,7 +31,7 @@ if (ENVIRONMENT_IS_NODE) {
 
 // --pre-jses are emitted after the Module integration code, so that they can
 // refer to Module (if they choose; they can also define Module)
-// include: C:\Users\marco\AppData\Local\Temp\tmpiedsmr29.js
+// include: C:\Users\marco\AppData\Local\Temp\tmprx213e7u.js
 
   Module['expectedDataFileDownloads'] ??= 0;
   Module['expectedDataFileDownloads']++;
@@ -208,25 +208,25 @@ Module['FS_createPath']("/", "data", true, true);
     }
 
     }
-    loadPackage({"files": [{"filename": "/data/shader.wgsl", "start": 0, "end": 882}, {"filename": "/data/vox.wgsl", "start": 882, "end": 9306}], "remote_package_size": 9306});
+    loadPackage({"files": [{"filename": "/data/shader.wgsl", "start": 0, "end": 883}, {"filename": "/data/vox.wgsl", "start": 883, "end": 9300}], "remote_package_size": 9300});
 
   })();
 
-// end include: C:\Users\marco\AppData\Local\Temp\tmpiedsmr29.js
-// include: C:\Users\marco\AppData\Local\Temp\tmp6vkgdfc5.js
+// end include: C:\Users\marco\AppData\Local\Temp\tmprx213e7u.js
+// include: C:\Users\marco\AppData\Local\Temp\tmpia_cvs53.js
 
     // All the pre-js content up to here must remain later on, we need to run
     // it.
     if (Module['$ww'] || (typeof ENVIRONMENT_IS_PTHREAD != 'undefined' && ENVIRONMENT_IS_PTHREAD)) Module['preRun'] = [];
     var necessaryPreJSTasks = Module['preRun'].slice();
-  // end include: C:\Users\marco\AppData\Local\Temp\tmp6vkgdfc5.js
-// include: C:\Users\marco\AppData\Local\Temp\tmp22ydlbmp.js
+  // end include: C:\Users\marco\AppData\Local\Temp\tmpia_cvs53.js
+// include: C:\Users\marco\AppData\Local\Temp\tmp0dv0ak1f.js
 
     if (!Module['preRun']) throw 'Module.preRun should exist because file support used it; did a pre-js delete it?';
     necessaryPreJSTasks.forEach((task) => {
       if (Module['preRun'].indexOf(task) < 0) throw 'All preRun tasks that exist before user pre-js code should remain after; did you replace Module or modify Module.preRun?';
     });
-  // end include: C:\Users\marco\AppData\Local\Temp\tmp22ydlbmp.js
+  // end include: C:\Users\marco\AppData\Local\Temp\tmp0dv0ak1f.js
 
 
 // Sometimes an existing Module object exists with properties
@@ -8700,6 +8700,8 @@ function ImGui_ImplGlfw_EmscriptenOpenURL(url) { url = url ? UTF8ToString(url) :
       return WebGPU.mgrTextureView.create(texture.createView(desc));
     };
 
+  var _wgpuTextureDestroy = (textureId) => WebGPU.mgrTexture.get(textureId).destroy();
+
   var _wgpuTextureGetFormat = (textureId) => {
       var texture = WebGPU.mgrTexture.get(textureId);
       // Should return the enum integer instead of string.
@@ -9244,6 +9246,8 @@ var wasmImports = {
   wgpuSurfaceGetPreferredFormat: _wgpuSurfaceGetPreferredFormat,
   /** @export */
   wgpuTextureCreateView: _wgpuTextureCreateView,
+  /** @export */
+  wgpuTextureDestroy: _wgpuTextureDestroy,
   /** @export */
   wgpuTextureGetFormat: _wgpuTextureGetFormat,
   /** @export */
