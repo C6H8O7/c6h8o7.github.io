@@ -205,6 +205,8 @@ fn has_voxel(p: vec3i, depth: u32) -> Voxel {
         } else {
             let i = current_index + i32(path_index) / 2;
             let v = (svo[i] >> (path_index%2 * 16)) & 0xffff;
+            //let i = current_index + i32(path_index);
+            //let v = svo[i];
 
             if v == 0 {
                 return Voxel(false, 0, current_depth, pos);
@@ -306,7 +308,7 @@ struct FragmentOutput {
 @fragment
 fn fs_main(in: VertexOutput) -> FragmentOutput {
     var out: FragmentOutput;
-    //out.depth = f32(0.999);
+    out.depth = f32(0.999);
     out.col = vec4f(0., 0., 0., 1.);
 
     let ray = normalize(in.ray_dir);

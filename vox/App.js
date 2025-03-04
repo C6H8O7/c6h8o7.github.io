@@ -31,7 +31,7 @@ if (ENVIRONMENT_IS_NODE) {
 
 // --pre-jses are emitted after the Module integration code, so that they can
 // refer to Module (if they choose; they can also define Module)
-// include: C:\Users\marco\AppData\Local\Temp\tmprx213e7u.js
+// include: C:\Users\marco\AppData\Local\Temp\tmpz2osdxc7.js
 
   Module['expectedDataFileDownloads'] ??= 0;
   Module['expectedDataFileDownloads']++;
@@ -208,25 +208,25 @@ Module['FS_createPath']("/", "data", true, true);
     }
 
     }
-    loadPackage({"files": [{"filename": "/data/shader.wgsl", "start": 0, "end": 883}, {"filename": "/data/vox.wgsl", "start": 883, "end": 9300}], "remote_package_size": 9300});
+    loadPackage({"files": [{"filename": "/data/shader.wgsl", "start": 0, "end": 883}, {"filename": "/data/vox.wgsl", "start": 883, "end": 9383}], "remote_package_size": 9383});
 
   })();
 
-// end include: C:\Users\marco\AppData\Local\Temp\tmprx213e7u.js
-// include: C:\Users\marco\AppData\Local\Temp\tmpia_cvs53.js
+// end include: C:\Users\marco\AppData\Local\Temp\tmpz2osdxc7.js
+// include: C:\Users\marco\AppData\Local\Temp\tmprtdhdegu.js
 
     // All the pre-js content up to here must remain later on, we need to run
     // it.
     if (Module['$ww'] || (typeof ENVIRONMENT_IS_PTHREAD != 'undefined' && ENVIRONMENT_IS_PTHREAD)) Module['preRun'] = [];
     var necessaryPreJSTasks = Module['preRun'].slice();
-  // end include: C:\Users\marco\AppData\Local\Temp\tmpia_cvs53.js
-// include: C:\Users\marco\AppData\Local\Temp\tmp0dv0ak1f.js
+  // end include: C:\Users\marco\AppData\Local\Temp\tmprtdhdegu.js
+// include: C:\Users\marco\AppData\Local\Temp\tmpamnioqnj.js
 
     if (!Module['preRun']) throw 'Module.preRun should exist because file support used it; did a pre-js delete it?';
     necessaryPreJSTasks.forEach((task) => {
       if (Module['preRun'].indexOf(task) < 0) throw 'All preRun tasks that exist before user pre-js code should remain after; did you replace Module or modify Module.preRun?';
     });
-  // end include: C:\Users\marco\AppData\Local\Temp\tmp0dv0ak1f.js
+  // end include: C:\Users\marco\AppData\Local\Temp\tmpamnioqnj.js
 
 
 // Sometimes an existing Module object exists with properties
@@ -7523,6 +7523,12 @@ function ImGui_ImplGlfw_EmscriptenOpenURL(url) { url = url ? UTF8ToString(url) :
   'float32-filterable':"11",
   },
   };
+  var _wgpuAdapterGetLimits = (adapterId, limitsOutPtr) => {
+      var adapter = WebGPU.mgrAdapter.get(adapterId);
+      WebGPU.fillLimitStruct(adapter.limits, limitsOutPtr);
+      return 1;
+    };
+
   var _wgpuAdapterRelease = (id) => WebGPU.mgrAdapter.release(id);
 
   
@@ -9150,6 +9156,8 @@ var wasmImports = {
   glfwSetWindowUserPointer: _glfwSetWindowUserPointer,
   /** @export */
   glfwWindowHint: _glfwWindowHint,
+  /** @export */
+  wgpuAdapterGetLimits: _wgpuAdapterGetLimits,
   /** @export */
   wgpuAdapterRelease: _wgpuAdapterRelease,
   /** @export */
