@@ -36,6 +36,8 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
 }
 // VOX.WGSL
 
+//////////////////////////////////////// UTILS
+
 fn svo_abs(v: i32) -> u32 {
     if v < 0 {
         return u32(abs(v) - 1);
@@ -125,6 +127,7 @@ struct RenderSettings {
     show_depth: i32,
     light_theta: f32,
     light_phi: f32,
+    ao: i32,
 };
 @group(0) @binding(2)
 var<uniform> render_settings: RenderSettings;
@@ -168,6 +171,8 @@ fn vs_main(in: VertexInput) -> VertexOutput {
     out.ray_dir = (camera.inv_view_proj * (vec4f(out.vertex_position.xy, 1.0, 1.0) * camera.zfar - vec4f(out.vertex_position.xy, -1.0, 1.0) * camera.znear)).xyz;
     return out;
 }
+
+//////////////////////////////////////// SVO
 
 struct Voxel {
     exist: bool,
@@ -236,6 +241,8 @@ fn has_voxel(p: vec3i, depth: u32) -> Voxel {
     return voxel_result;
 }
 
+//////////////////////////////////////// RAY TRACE
+
 struct Ray {
     pos: vec3f,
     dir: vec3f
@@ -247,7 +254,8 @@ struct RayResult {
     steps: u32,
     dist: f32,
     pos: vec3f,
-    normal: vec3f
+    normal: vec3f,
+    mask: vec3f
 };
 
 fn ray_trace(ray: Ray) -> RayResult {
@@ -255,7 +263,7 @@ fn ray_trace(ray: Ray) -> RayResult {
     let dir = ray.dir;
     let depth = u32(svo[0]);
     var pre_dist = f32(0);
-    var ray_result = RayResult(false, 0, 0, f32(0), vec3f(0), vec3f(0));
+    var ray_result = RayResult(false, 0, 0, f32(0), vec3f(0), vec3f(0), vec3f(0));
 
     if !is_in_bounds(vec3f_to_vec3i(pos), depth) {
         let half_size = f32(1u << depth);
@@ -276,6 +284,7 @@ fn ray_trace(ray: Ray) -> RayResult {
     var steps = 0u;
     var normal = vec3f(0);
     var t_current = f32(0);
+    var mask = vec3f(0);
 
     loop {
         let posi = vec3f_to_vec3i(current_pos);
@@ -288,13 +297,14 @@ fn ray_trace(ray: Ray) -> RayResult {
             ray_result.dist = t_current + pre_dist;
             ray_result.pos = current_pos + normal * 0.001;
             ray_result.normal = normal;
+            ray_result.mask = mask;
             return ray_result;
         }
 
         let half_voxel_size = size / f32(1u << (voxel.depth + 1));
         let t_max = (voxel.pos + dir_sign * half_voxel_size - pos) * dir_inv;
         t_current = min(min(t_max.x, t_max.y), t_max.z);
-        let mask = vec3f(t_max.xyz <= min(t_max.yzx, t_max.zxy));
+        mask = vec3f(t_max.xyz <= min(t_max.yzx, t_max.zxy));
         normal = mask * -dir_sign;
 
         current_pos = pos + dir * t_current - normal * 0.0005;
@@ -313,6 +323,35 @@ fn ray_trace(ray: Ray) -> RayResult {
     
     return ray_result;
 }
+
+//////////////////////////////////////// VOXEL AO
+
+fn vertex_ao(side: vec2f, corner: f32) -> f32 {
+	//if side.x == 1.0 && side.y == 1.0 { return 1.0; }
+	return (side.x + side.y + max(corner, side.x * side.y)) / 3.0;
+}
+
+fn has_voxel_ao(pos: vec3f, depth: u32) -> f32 {
+    let posi = vec3f_to_vec3i(pos);
+    let voxel = has_voxel(posi, depth);
+    if voxel.exist {
+        return 1.0;
+    }
+    return 0.0;
+}
+
+fn voxel_ao(pos: vec3f, d1: vec3f, d2: vec3f, depth: u32) -> vec4f {
+	let side = vec4f(has_voxel_ao(pos + d1, depth), has_voxel_ao(pos + d2, depth), has_voxel_ao(pos - d1, depth), has_voxel_ao(pos - d2, depth));
+	let corner = vec4f(has_voxel_ao(pos + d1 + d2, depth), has_voxel_ao(pos - d1 + d2, depth), has_voxel_ao(pos - d1 - d2, depth), has_voxel_ao(pos + d1 - d2, depth));
+	var ao = vec4f(0.0);
+	ao.x = vertex_ao(side.xy, corner.x);
+	ao.y = vertex_ao(side.yz, corner.y);
+	ao.z = vertex_ao(side.zw, corner.z);
+	ao.w = vertex_ao(side.wx, corner.w);
+	return vec4f(1.0) - ao;
+}
+
+//////////////////////////////////////// FRAGMENT
 
 struct FragmentOutput {
     @location(0) col: vec4f,
@@ -346,6 +385,16 @@ fn fs_main(in: VertexOutput) -> FragmentOutput {
         let ambient_col = vec4f(0.25f, 0.25f, 0.25f, 0.0f);
         var diffuse_col = vec4f(1.f, 1.f, 1.f, 0.0f);
 
+        var ao = 1.0f;
+        if (render_settings.ao == 1) {
+            let ambient = voxel_ao(ray_result.pos - ray_result.normal * 0.002 - sign(ray) * ray_result.mask, ray_result.mask.zxy, ray_result.mask.yzx, u32(svo[0]));
+            let d = vec2f(dot(ray_result.mask * ray_result.pos.yzx, vec3f(1.0)), dot(ray_result.mask * ray_result.pos.zxy, vec3f(1.0)));
+            let uv = d - vec2f(1.0) * floor(d);
+	        let interp_ao = mix(mix(ambient.z, ambient.w, uv.x), mix(ambient.y, ambient.x, uv.x), uv.y);
+            let base_ao = 0.75 + interp_ao * 0.25;
+            ao = pow(base_ao, 2.0);
+        }
+
         if ray_result.value == 1 {
             diffuse_col = vec4f(1.f, 0.f, 0.f, 0.f);
         } else if ray_result.value == 2 {
@@ -363,7 +412,7 @@ fn fs_main(in: VertexOutput) -> FragmentOutput {
         out.depth = ray_result.dist / (camera.zfar - camera.znear);
 
         var l_factor = max(dot(ray_result.normal, light_dir), 0.0);
-        out.col += ambient_col * diffuse_col;
+        out.col += ambient_col * diffuse_col * ao;
 
         if l_factor > 0.0f {
             let light_ray_result = ray_trace(Ray(ray_result.pos, light_dir));
@@ -373,7 +422,7 @@ fn fs_main(in: VertexOutput) -> FragmentOutput {
             }
         }
 
-        out.col += diffuse_col * l_factor;
+        out.col += diffuse_col * l_factor * ao;
     }
 
     if (render_settings.show_steps == 1) {
