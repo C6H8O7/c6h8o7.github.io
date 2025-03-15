@@ -197,7 +197,7 @@ struct CameraUniform {
 var<uniform> camera: CameraUniform;
 
 @group(0) @binding(1)
-var<storage, read_write> svo: array<i32>;
+var<storage, read_write> nodes: array<i32>;
 
 struct RenderSettings {
     show_steps: i32,
@@ -258,8 +258,8 @@ struct Voxel {
     pos: vec3f,
 }
 
-fn has_voxel(p: vec3i, depth: u32) -> Voxel {
-    let p0f = vec3i_to_vec3f(p) + vec3f(.5, .5, .5);
+fn has_voxel(p: vec3i, depth: u32, index: i32) -> Voxel {
+    let p0f = vec3i_to_vec3f(p);
     var current_depth = 0u;
 
     var voxel_result = Voxel(false, 0, current_depth, p0f);
@@ -269,9 +269,9 @@ fn has_voxel(p: vec3i, depth: u32) -> Voxel {
     }
 
     let path = get_position_path(p, depth);
-    let size = vec3i_to_vec3f(vec3i(1i << (depth + 1)));
+    let half_size = vec3i_to_vec3f(vec3i(1i << depth));
     var depth_shift = i32(depth * 3);
-    var current_index = 1i;
+    var current_index = index;
     var pos = vec3f(0);
     
     while depth_shift >= 0 {
@@ -279,9 +279,9 @@ fn has_voxel(p: vec3i, depth: u32) -> Voxel {
         
         let path_index = ((path >> u32(depth_shift)) & 7);
         let path_index_mask = 1i << path_index;
-        let current_node = svo[current_index];
+        let current_node = nodes[current_index];
         
-        let offset = size / f32(1i << (current_depth + 1));
+        let offset = half_size / f32(1i << current_depth);
         let mask = vec3i_to_vec3f(vec3i(p0f >= pos) * 2 - 1);
         pos += mask * offset;
         
@@ -296,7 +296,7 @@ fn has_voxel(p: vec3i, depth: u32) -> Voxel {
         if is_next_leaf {
             let leaf_ptr = ((current_node >> 17) & 0x7fff);
             let i = current_index + leaf_ptr + i32(path_index) / 4;
-            let value = (svo[i] >> (path_index%4 * 8)) & 0xff;
+            let value = (nodes[i] >> (path_index%4 * 8)) & 0xff;
             
             return Voxel(true, u32(value), current_depth, pos);
         }
@@ -305,7 +305,83 @@ fn has_voxel(p: vec3i, depth: u32) -> Voxel {
         var next_offset = ((current_node >> 17) & 0x7fff);
 
         if is_far_ptr {
-            next_offset = svo[current_index + next_offset];
+            next_offset = nodes[current_index + next_offset];
+        }
+
+        current_index += next_offset + i32(path_index);
+
+        depth_shift -= 3;
+    }
+
+    voxel_result.pos = pos;
+    voxel_result.depth = current_depth;
+    return voxel_result;
+}
+
+fn has_meta_voxel(p: vec3f, depth: u32, sub_depth: u32) -> Voxel {
+    let sub_size = 1 << (sub_depth + 1);
+    let sub_size_f = f32(1 << (sub_depth + 1));
+    let p_meta = vec3i(
+        i32(p.x / sub_size_f) - select(0, 1, p.x < 0),
+        i32(p.y / sub_size_f) - select(0, 1, p.y < 0),
+        i32(p.z / sub_size_f) - select(0, 1, p.z < 0)
+    );
+
+    let p0f = vec3i_to_vec3f(p_meta);
+    var current_depth = 0u;
+
+    var voxel_result = Voxel(false, 0, current_depth, p0f);
+
+    if !is_in_bounds(p_meta, depth) {
+        return voxel_result;
+    }
+
+    let path = get_position_path(p_meta, depth);
+    let half_size = vec3i_to_vec3f(vec3i(1i << depth));
+    var depth_shift = i32(depth * 3);
+    var current_index = 1i;
+    var pos = vec3f(0);
+    
+    while depth_shift >= 0 {
+        current_depth += 1u;
+        
+        let path_index = ((path >> u32(depth_shift)) & 7);
+        let path_index_mask = 1i << path_index;
+        let current_node = nodes[current_index];
+        
+        let offset = half_size / f32(1i << current_depth);
+        let mask = vec3i_to_vec3f(vec3i(p0f >= pos) * 2 - 1);
+        pos += mask * offset;
+        
+        let is_next_valid = ((current_node >> 8) & path_index_mask) > 0;
+
+        if !is_next_valid {
+            let world_pos = pos * f32(sub_size);
+            return Voxel(false, 0, current_depth, world_pos);
+        }
+        
+        let is_next_leaf = (current_node & path_index_mask) > 0;
+        
+        if is_next_leaf {
+            let svo_ptr = ((current_node >> 17) & 0x7fff);
+            let i = current_index + svo_ptr + i32(path_index);
+            let svo_offset = nodes[i];
+
+            let p_sub = vec3f_to_vec3i(p) - p_meta * i32(sub_size) - sub_size / 2;
+
+            voxel_result = has_voxel(p_sub, sub_depth, svo_offset + 1);
+
+            voxel_result.depth += depth + 1;
+            voxel_result.pos = voxel_result.pos + vec3f(f32(sub_size) / 2) + vec3f(p_meta) * f32(sub_size);
+
+            return voxel_result;
+        }
+
+        let is_far_ptr = (current_node & 0x10000) > 0;
+        var next_offset = ((current_node >> 17) & 0x7fff);
+
+        if is_far_ptr {
+            next_offset = nodes[current_index + next_offset];
         }
 
         current_index += next_offset + i32(path_index);
@@ -335,15 +411,19 @@ struct RayResult {
     mask: vec3f
 };
 
+const RAY_STEPS = 200;
+
 fn ray_trace(ray: Ray) -> RayResult {
     var pos = ray.pos;
     let dir = ray.dir;
-    let depth = u32(svo[0]);
+    let depth = u32(nodes[0]) & 0xff;
+    let sub_depth = (u32(nodes[0]) >> 8) & 0xff;
+    let total_depth = depth + sub_depth + 1;
     var pre_dist = f32(0);
     var ray_result = RayResult(false, 0, 0, f32(0), vec3f(0), vec3f(0), vec3f(0));
 
-    if !is_in_bounds(vec3f_to_vec3i(pos), depth) {
-        let half_size = f32(1u << depth);
+    if !is_in_bounds(vec3f_to_vec3i(pos), total_depth) {
+        let half_size = f32(1u << (total_depth + 0));
         pre_dist = ray_box_dist(pos, dir, vec3f(-half_size), vec3f(half_size));
 
         if pre_dist == 0.0f {
@@ -355,7 +435,7 @@ fn ray_trace(ray: Ray) -> RayResult {
 
     let dir_inv = 1.0 / dir;
     let dir_sign = sign(dir);
-    let size = f32(1u << (depth + 1));
+    let half_size = f32(1u << (depth + sub_depth + 1));
 
     var current_pos = pos;
     var steps = 0u;
@@ -365,7 +445,7 @@ fn ray_trace(ray: Ray) -> RayResult {
 
     loop {
         let posi = vec3f_to_vec3i(current_pos);
-        let voxel = has_voxel(posi, depth);
+        let voxel = has_meta_voxel(current_pos, depth, sub_depth);
 
         if voxel.exist {
             ray_result.hit = true;
@@ -378,22 +458,23 @@ fn ray_trace(ray: Ray) -> RayResult {
             return ray_result;
         }
 
-        let half_voxel_size = size / f32(1u << (voxel.depth + 1));
-        let t_max = (voxel.pos + dir_sign * half_voxel_size - pos) * dir_inv;
+        let voxel_size = half_size / f32(1u << (voxel.depth + 0));
+        let t_max = (voxel.pos + dir_sign * voxel_size - pos) * dir_inv;
         t_current = min(min(t_max.x, t_max.y), t_max.z);
+
         mask = vec3f(t_max.xyz <= min(t_max.yzx, t_max.zxy));
         normal = mask * -dir_sign;
 
         current_pos = pos + dir * t_current - normal * 0.0005;
 
-        if !is_in_bounds(vec3f_to_vec3i(current_pos), depth) {
+        steps = steps + 1;
+
+        if !is_in_bounds(vec3f_to_vec3i(current_pos), total_depth) {
             ray_result.steps = steps;
             return ray_result;
         }
 
-        steps = steps + 1;
-
-        if steps > 100u {
+        if steps > RAY_STEPS {
             break;
         }
     }
@@ -403,7 +484,7 @@ fn ray_trace(ray: Ray) -> RayResult {
 
 //////////////////////////////////////// VOXEL AO
 
-fn vertex_ao(side: vec2f, corner: f32) -> f32 {
+/*fn vertex_ao(side: vec2f, corner: f32) -> f32 {
 	//if side.x == 1.0 && side.y == 1.0 { return 1.0; }
 	return (side.x + side.y + max(corner, side.x * side.y)) / 3.0;
 }
@@ -426,7 +507,7 @@ fn voxel_ao(pos: vec3f, d1: vec3f, d2: vec3f, depth: u32) -> vec4f {
 	ao.z = vertex_ao(side.zw, corner.z);
 	ao.w = vertex_ao(side.wx, corner.w);
 	return vec4f(1.0) - ao;
-}
+}*/
 
 //////////////////////////////////////// FRAGMENT
 
@@ -435,11 +516,18 @@ struct FragmentOutput {
     @builtin(frag_depth) depth: f32,
 };
 
+const PALETTE = array(
+    vec4f(1., 0., 1., 0.),
+    vec4f(0.5, 0.5, 0.5, 0.),
+    vec4f(0.34, 0.16, 0.05, 0.),
+    vec4f(0.30, 0.45, 0.08, 0.),
+);
+
 @fragment
 fn fs_main(in: VertexOutput) -> FragmentOutput {
     var out: FragmentOutput;
     out.depth = f32(0.999);
-    out.col = vec4f(0., 0., 0., 1.);
+    out.col = vec4f(0.25, 0.30, 0.50, 1.);
 
     var ray = normalize(in.ray_dir);
     if ray.x == 0.0 {
@@ -454,11 +542,13 @@ fn fs_main(in: VertexOutput) -> FragmentOutput {
 
     let ray_result = ray_trace(Ray(in.ray_origin, ray));
 
-    let theta = render_settings.light_theta;
-    let phi = render_settings.light_phi;
-    let light_dir = vec3f(sin(theta) * cos(phi), sin(theta) * sin(phi), cos(theta));
-
     if ray_result.hit {
+        out.col = vec4f(0., 0., 0., 1.);
+
+        let theta = render_settings.light_theta;
+        let phi = render_settings.light_phi;
+        let light_dir = vec3f(sin(theta) * cos(phi), sin(theta) * sin(phi), cos(theta));
+
         let ambient_factor = 0.4f;
         let light_factor = 1.0f - ambient_factor;
 
@@ -467,31 +557,19 @@ fn fs_main(in: VertexOutput) -> FragmentOutput {
 
         var ao = 1.0f;
         if (render_settings.ao == 1) {
-            let ambient = voxel_ao(ray_result.pos - ray_result.normal * 0.002 - sign(ray) * ray_result.mask, ray_result.mask.zxy, ray_result.mask.yzx, u32(svo[0]));
+            /*let ambient = voxel_ao(ray_result.pos - ray_result.normal * 0.002 - sign(ray) * ray_result.mask, ray_result.mask.zxy, ray_result.mask.yzx, u32(svo[0]));
             let d = vec2f(dot(ray_result.mask * ray_result.pos.yzx, vec3f(1.0)), dot(ray_result.mask * ray_result.pos.zxy, vec3f(1.0)));
             let uv = d - vec2f(1.0) * floor(d);
 	        let interp_ao = mix(mix(ambient.z, ambient.w, uv.x), mix(ambient.y, ambient.x, uv.x), uv.y);
             let base_ao = 0.75 + interp_ao * 0.25;
-            ao = pow(base_ao, 2.0);
+            ao = pow(base_ao, 2.0);*/
         }
 
-        if ray_result.value == 1 {
-            diffuse_col = vec4f(1.f, 0.f, 0.f, 0.f);
-        } else if ray_result.value == 2 {
-            diffuse_col = vec4f(0.f, 1.f, 0.f, 0.f);
-        } else if ray_result.value == 3 {
-            diffuse_col = vec4f(0.f, 0.f, 1.f, 0.f);
-        } else if ray_result.value == 4 {
-            diffuse_col = vec4f(1.f, 1.f, 0.f, 0.f);
-        } else if ray_result.value == 5 {
-            diffuse_col = vec4f(1.f, 0.f, 1.f, 1.f);
-            out.col = diffuse_col;
-            return out;
-        }
+        diffuse_col = PALETTE[ray_result.value];
 
         let noise = perlinNoise3(floor(ray_result.pos) + vec3f(0.5, 0.5, 0.5));
 
-        diffuse_col *= (1.0 + noise * 0.15);
+        diffuse_col *= (1.0 + noise * 0.2);
 
         out.depth = ray_result.dist / (camera.zfar - camera.znear);
         out.col += diffuse_col * ambient_light * ao;
@@ -510,7 +588,7 @@ fn fs_main(in: VertexOutput) -> FragmentOutput {
     }
 
     if (render_settings.show_steps == 1) {
-        let v = f32(ray_result.steps) / 100.0;
+        let v = f32(ray_result.steps) / RAY_STEPS;
         out.col = vec4f(v, v, v, 1.);
     }
 
